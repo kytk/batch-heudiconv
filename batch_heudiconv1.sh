@@ -29,7 +29,7 @@ fi
 # remove blank line beforehand using sed '/^$/d'
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
 do
-  heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
+  heudiconv -d DICOM/sorted/${dname}/*/* \
 	-o Nifti -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite 
