@@ -5,16 +5,17 @@
 # Part of this script is based on the script provided by Yuya Saito
 # Prerequisite: pydicom
 
-# 02 Jan 2023 K. Nemoto
+# 13 Feb 2023 K. Nemoto
  
 import sys, os, time, re, shutil, argparse
 import pydicom
  
-__version__ = '20230102'
+__version__ = '20230213'
  
 __desc__ = '''
 sort dicom files.
-PatientID is assumed from the directory name
+Please note that PatientID is assumed from the directory name.
+Non-imaging DICOM will be skipped.
 '''
 __epilog__ = '''
 examples:
@@ -42,14 +43,15 @@ def copy_dicom_files(src_dir):
             try:
                 src_file = os.path.join(root, file)
                 ds = pydicom.dcmread(src_file)
-                dest_dir_name = generate_dest_dir_name(ds)
-                out_dir = sorteddir + src_dir 
-                print(src_file, dest_dir_name)
-                dest_dir = os.path.join(out_dir, dest_dir_name)
-                dir_names.append(dest_dir_name)
-                os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy2(src_file, dest_dir)
-                print("copy %s -> %s" % (src_file, dest_dir))
+                if hasattr(ds, 'pixel_array'):
+                    dest_dir_name = generate_dest_dir_name(ds)
+                    out_dir = sorteddir + src_dir.replace('/','') 
+                    print(src_file, dest_dir_name)
+                    dest_dir = os.path.join(out_dir, dest_dir_name)
+                    dir_names.append(dest_dir_name)
+                    os.makedirs(dest_dir, exist_ok=True)
+                    shutil.copy2(src_file, dest_dir)
+                    print("copy %s -> %s" % (src_file, dest_dir))
             except:
                 pass
 
