@@ -39,9 +39,8 @@ def infotodict(seqinfo):
     #dwi_AP = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_dwi')
 
     # Filed map (magnitude and phasediff: Siemens)
-    # If you have double echo field maps, convert phasediff first, then convert magnitude later. 
-    #fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
-    #fmap_phase = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_phasediff')
+    fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
+    fmap_phase = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_phasediff')
 
     # Field map (two phases: Siemens)
     #fmap_PA =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-PA_fieldmap')
@@ -52,8 +51,7 @@ def infotodict(seqinfo):
     #fmap_field = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_fieldmap')
     
 
-    #info = {t1w: [], func_rest: [], dwi: [], fmap_mag: [], fmap_phase: []}
-    info = {t1w: [], func_rest: [], dwi: []}
+    info = {t1w: [], func_rest: [], dwi: [], fmap_mag: [], fmap_phase: []}
 
     ############################################################################
 
@@ -113,10 +111,10 @@ def infotodict(seqinfo):
 
         # Fieldmap
         # Fieldmap (magnitude and phasediff: Siemens)
-        #if 'dir_name_for_fieldmap_magnitude' in s.dcm_dir_name:    
-        #    info[fmap_mag].append(s.series_id)
-        #if 'dir_name_for_fieldmap_phasediff' in s.dcm_dir_name:    
-        #    info[fmap_phase].append(s.series_id)
+        if 'dir_name_for_fieldmap_magnitude' in s.dcm_dir_name:    
+            info[fmap_mag].append(s.series_id)
+        if 'dir_name_for_fieldmap_phasediff' in s.dcm_dir_name:    
+            info[fmap_phase].append(s.series_id)
 
         # Fieldmap (two phases: Siemens)
         #if 'dir_name_for_fieldmap_PA' in s.dcm_dir_name:    
