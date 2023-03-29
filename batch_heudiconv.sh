@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # script to execute heudiconv
-# Usage: batch_heudiconv1 heuristic.py subjlist
+# Usage: batch_heudiconv heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
@@ -9,7 +9,7 @@
 
 # Dicom must be sorted beforehand using dcm_sort_dir.py
 
-# K. Nemoto 08 Jan 2023
+# K. Nemoto 29 Mar 2023
 
 set -x
 
@@ -20,8 +20,8 @@ subjlist=$2
 # Make sure you specify a heuristic.py for the first argument
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
-  echo "Please specify heuristics.py first"
-  echo "Usage: $0 heuristics.py subjlist.txt"
+  echo "Please specify heuristic.py first"
+  echo "Usage: $0 heuristic.py subjlist.txt"
   exit 1
 fi
 

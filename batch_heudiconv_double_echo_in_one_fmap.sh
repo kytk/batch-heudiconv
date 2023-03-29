@@ -3,13 +3,13 @@
 # script to execute heudiconv for double-echo fieldmap in a special case
 # This will generate a magnitude nifti image
 
-# Usage: batch_heudiconv2 heuristic.py subjlist
+# Usage: batch_heudiconv_double_echo_in_one_fmap.sh heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
-# batch_heudiconv1.sh must be executed befor running this script
+# batch_heudiconv.sh must be executed befor running this script
 
-# K. Nemoto 08 Jan 2023
+# K. Nemoto 29 Mar 2023
 
 
 set -x
@@ -22,7 +22,7 @@ subjlist=$2
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
   echo "Please specify heuristic.py first"
-  echo "Usage: $0 heuristics.py subjlist.txt"
+  echo "Usage: $0 heuristic.py subjlist.txt"
   exit 1
 fi
 
