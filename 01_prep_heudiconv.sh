@@ -15,7 +15,7 @@ cd workingDir
 
 # copy "code" and subjlist.sample.txt
 cp -r ${batchpath}/code .
-cp ${batchpath}/subjlist.sample.txt subjlist.sample.txt
+cp ${batchpath}/subjlist*txt .
 
 echo "Preparation is done."
 
