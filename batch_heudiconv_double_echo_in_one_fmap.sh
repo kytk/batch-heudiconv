@@ -21,7 +21,7 @@ subjlist=$2
 # Make sure you specify a heuristic.py for the first argument
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
-  echo "Please specify heuristics.py first"
+  echo "Please specify heuristic.py first"
   echo "Usage: $0 heuristics.py subjlist.txt"
   exit 1
 fi
@@ -31,7 +31,7 @@ fi
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
 do
   heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
-	-o Nifti -f ${heuristics} \
+	-o Nifti -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite \
         --dcmconfig code/merge.json
