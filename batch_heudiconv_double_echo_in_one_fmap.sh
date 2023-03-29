@@ -31,9 +31,17 @@ fi
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
 do
   heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
-	-o Nifti -f ${heuristic} \
+	-o Nifti_tmp -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite \
         --dcmconfig code/merge.json
 done
+
+# cp sub- to Nifti
+find Nifti_tmp -type d -name 'sub-*' -exec sudo cp -r {} Nifti \;
+rm -rf Nifti_tmp
+
+# change permission
+find Nifti -type d -exec sudo chmod 755 {} \;
+find Nifti -type f -exec sudo chmod 644 {} \;
 

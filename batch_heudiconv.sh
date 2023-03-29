@@ -35,3 +35,7 @@ do
 	-c dcm2niix -b --overwrite 
 done
 
+# change permission
+find Nifti -type d -exec sudo chmod 755 {} \;
+find Nifti -type f -exec sudo chmod 644 {} \;
+
