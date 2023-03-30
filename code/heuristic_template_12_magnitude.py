@@ -1,3 +1,8 @@
+# heuristic file for images which have fieldmap with two different TEs in one magnitude image
+# Usage: Use heuristic_*_without_magnitude.py to convert images except for magnitude fieldmap.
+#        Then, use heuristic_*_12_magnitude.py to convert magnitude fieldmap
+# 30 Mar 2023 K.Nemoto
+
 import os
 
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
@@ -24,14 +29,6 @@ def infotodict(seqinfo):
     fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
     #fmap_phase = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_phasediff')
 
-    # Field map (two phases: Siemens)
-    #fmap_PA =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-PA_fieldmap')
-    #fmap_AP =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-AP_fieldmap')
-
-    # Field map (magnitude and field: GE)
-    #fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
-    #fmap_field = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_fieldmap')
-    
 
     #info = {t1w: [], func_rest: [], dwi: [], fmap_mag: [], fmap_phase: []}
     info = {fmap_mag: []}
@@ -70,20 +67,6 @@ def infotodict(seqinfo):
         # Fieldmap (magnitude and phasediff: Siemens)
         if 'dir_name_for_fieldmap_magnitude' in s.dcm_dir_name:    
             info[fmap_mag].append(s.series_id)
-        #if 'dir_name_for_fieldmap_phasediff' in s.dcm_dir_name:    
-        #    info[fmap_phase].append(s.series_id)
-
-        # Fieldmap (two phases: Siemens)
-        #if 'dir_name_for_fieldmap_PA' in s.dcm_dir_name:    
-        #    info[fmap_PA].append(s.series_id)
-        #if 'dir_name_for_fieldmap_AP' in s.dcm_dir_name:    
-        #    info[fmap_AP].append(s.series_id)
-
-        # Fieldmap (magnitude and field: GE)
-        #if 'field_map1' in s.dcm_dir_name:    
-        #    info[fmap_mag].append(s.series_id)
-        #if 'field_map2' in s.dcm_dir_name:    
-        #    info[fmap_field].append(s.series_id)
 
             
     return info
