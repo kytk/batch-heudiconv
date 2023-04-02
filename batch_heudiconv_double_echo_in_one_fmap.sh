@@ -3,13 +3,13 @@
 # script to execute heudiconv for double-echo fieldmap in a special case
 # This will generate a magnitude nifti image
 
-# Usage: batch_heudiconv2 heuristic.py subjlist
+# Usage: batch_heudiconv_double_echo_in_one_fmap.sh heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
-# batch_heudiconv1.sh must be executed befor running this script
+# batch_heudiconv.sh must be executed befor running this script
 
-# K. Nemoto 08 Jan 2023
+# K. Nemoto 29 Mar 2023
 
 
 set -x
@@ -21,8 +21,8 @@ subjlist=$2
 # Make sure you specify a heuristic.py for the first argument
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
-  echo "Please specify heuristics.py first"
-  echo "Usage: $0 heuristics.py subjlist.txt"
+  echo "Please specify heuristic.py first"
+  echo "Usage: $0 heuristic.py subjlist.txt"
   exit 1
 fi
 
@@ -31,9 +31,17 @@ fi
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
 do
   heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
-	-o Nifti -f ${heuristics} \
+	-o Nifti_tmp -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite \
         --dcmconfig code/merge.json
 done
+
+# cp sub- to Nifti
+find Nifti_tmp -type d -name 'sub-*' -exec sudo cp -r {} Nifti \;
+rm -rf Nifti_tmp
+
+# change permission
+find Nifti -type d -exec sudo chmod 755 {} \;
+find Nifti -type f -exec sudo chmod 644 {} \;
 

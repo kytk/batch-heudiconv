@@ -1,9 +1,16 @@
+# heuristic file for images which have fieldmap with two different TEs in one magnitude image
+# Usage: Use heuristic_*_without_magnitude.py to convert images except for magnitude fieldmap.
+#        Then, use heuristic_*_12_magnitude.py to convert magnitude fieldmap
+# 30 Mar 2023 K.Nemoto
+
 import os
+
 
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
     return template, outtype, annotation_classes
+
 
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
@@ -40,7 +47,7 @@ def infotodict(seqinfo):
 
     # Filed map (magnitude and phasediff: Siemens)
     # If you have double echo field maps, convert phasediff first, then convert magnitude later. 
-    #fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
+    fmap_mag =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
     fmap_phase = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_phasediff')
 
     # Field map (two phases: Siemens)
