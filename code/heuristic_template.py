@@ -111,9 +111,9 @@ def infotodict(seqinfo):
 
         # Fieldmap
         # Fieldmap (magnitude and phasediff: Siemens)
-        if 'dir_name_for_fieldmap_magnitude' in s.dcm_dir_name:    
+        if 'dir_name_for_fieldmap_magnitude' in s.dcm_dir_name and 'M' in s.image_type:    
             info[fmap_mag].append(s.series_id)
-        if 'dir_name_for_fieldmap_phasediff' in s.dcm_dir_name:    
+        if 'dir_name_for_fieldmap_phasediff' in s.dcm_dir_name and 'P' in s.image_type:    
             info[fmap_phase].append(s.series_id)
 
         # Fieldmap (two phases: Siemens)
