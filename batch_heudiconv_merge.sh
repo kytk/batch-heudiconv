@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # script to execute heudiconv
-# Usage: batch_heudiconv1 heuristic.py subjlist
+# Usage: batch_heudiconv_merge.sh heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
@@ -9,7 +9,7 @@
 
 # Dicom must be sorted beforehand using dcm_sort_dir.py
 
-# K. Nemoto 08 Jan 2023
+# K. Nemoto 04 Apr 2023
 
 set -x
 
@@ -20,8 +20,8 @@ subjlist=$2
 # Make sure you specify a heuristic.py for the first argument
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
-  echo "Please specify heuristics.py first"
-  echo "Usage: $0 heuristics.py subjlist.txt"
+  echo "Please specify heuristic.py first"
+  echo "Usage: $0 heuristic.py subjlist.txt"
   exit 1
 fi
 
@@ -33,6 +33,10 @@ do
 	-o Nifti -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite \
-        --dcmconfig code/merge.json
+       --dcmconfig code/merge.json
 done
+
+# change permission
+find Nifti -type d -exec chmod 755 {} \;
+find Nifti -type f -exec chmod 644 {} \;
 

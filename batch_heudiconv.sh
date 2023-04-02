@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # script to execute heudiconv
-# Usage: batch_heudiconv heuristic.py subjlist
+# Usage: batch_heudiconv.sh heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
@@ -9,7 +9,7 @@
 
 # Dicom must be sorted beforehand using dcm_sort_dir.py
 
-# K. Nemoto 29 Mar 2023
+# K. Nemoto 04 Apr 2023
 
 set -x
 
@@ -36,6 +36,6 @@ do
 done
 
 # change permission
-find Nifti -type d -exec sudo chmod 755 {} \;
-find Nifti -type f -exec sudo chmod 644 {} \;
+find Nifti -type d -exec chmod 755 {} \;
+find Nifti -type f -exec chmod 644 {} \;
 

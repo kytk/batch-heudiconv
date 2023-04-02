@@ -41,7 +41,6 @@ done
 find Nifti_tmp -type d -name 'sub-*' -exec sudo cp -r {} Nifti \;
 rm -rf Nifti_tmp
 
-# change permission
-find Nifti -type d -exec sudo chmod 755 {} \;
-find Nifti -type f -exec sudo chmod 644 {} \;
+# change ownership
+sudo chown $USER:$USER Nifti
 
