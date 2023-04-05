@@ -25,6 +25,9 @@ if [[ $heuext != 'py' ]]; then
   exit 1
 fi
 
+# delete previous .heudiconv
+[[ -d Nifti/.heudiconv ]] && rm -rf Nifti/.heudiconv 
+
 # Run heudiconv
 # remove blank line beforehand using sed '/^$/d'
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
@@ -38,4 +41,5 @@ done
 # change permission
 find Nifti -type d -exec chmod 755 {} \;
 find Nifti -type f -exec chmod 644 {} \;
+
 
