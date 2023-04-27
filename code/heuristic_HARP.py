@@ -30,7 +30,7 @@ def infotodict(seqinfo):
     dwi_PA = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_dwi')
     dwi_AP = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_dwi')
     fmap_PA =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-PA_run-{item:02d}_fieldmap')
-    fmap_AP =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-AP_{item:02d}_fieldmap')
+    fmap_AP =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-AP_run-{item:02d}_fieldmap')
     info = {t1w: [], t2w: [], func_rest_PA: [], func_rest_AP: [], dwi_PA: [], dwi_AP: [], fmap_PA: [], fmap_AP: []}
 
 #######################################################################################################################
