@@ -1,16 +1,15 @@
 #!/bin/bash
 
-# script to execute heudiconv for double-echo fieldmap in a special case
-# This will generate a magnitude nifti image
-
-# Usage: batch_heudiconv_double_echo_in_one_fmap.sh heuristic.py subjlist
+# script to execute heudiconv
+# Usage: batch_heudiconv.sh heuristic.py subjlist
 # Please see heuristic_template.py and subjlist.sample.txt
 # to prepare the files
 
-# batch_heudiconv.sh must be executed befor running this script
+# Prerequisites: install dcm2niix and heudiconv
 
-# K. Nemoto 29 Mar 2023
+# Dicom must be sorted beforehand using dcm_sort_dir.py
 
+# K. Nemoto 25 May 2023
 
 set -x
 
@@ -26,6 +25,9 @@ if [[ $heuext != 'py' ]]; then
   exit 1
 fi
 
+# delete previous .heudiconv
+[[ -d Nifti/.heudiconv ]] && rm -rf Nifti/.heudiconv 
+
 # Run heudiconv
 # remove blank line beforehand using sed '/^$/d'
 tail +7 ${subjlist} | sed '/^$/d' | while read dname subj session
@@ -33,23 +35,21 @@ do
   nfiles=$(ls DICOM/sorted/${subj}_${session}/*field_mapping* | wc -w)
   if [[ $nfiles -le 90 ]]; then
     heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
-	-o Nifti_tmp -f ${heuristic} \
+	-o Nifti -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite \
 	--dcmconfig code/merge.json
 
   else
     heudiconv -d DICOM/sorted/${dname}/*/*.dcm \
-	-o Nifti_tmp -f ${heuristic} \
+	-o Nifti -f ${heuristic} \
 	-s ${subj} -ss ${session} \
 	-c dcm2niix -b --overwrite 
   fi
 done
 
-# cp sub- to Nifti
-find Nifti_tmp -type d -name 'sub-*' -exec sudo cp -r {} Nifti \;
-rm -rf Nifti_tmp
+# change permission
+find Nifti -type d -exec chmod 755 {} \;
+find Nifti -type f -exec chmod 644 {} \;
 
-# change ownership
-sudo chown $USER:$USER Nifti
 
