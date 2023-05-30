@@ -9,7 +9,7 @@
 
 # Dicom must be sorted beforehand using dcm_sort_dir.py
 
-# K. Nemoto 18 Feb 2023
+# K. Nemoto 30 May 2023
 
 set -x
 
@@ -20,10 +20,13 @@ subjlist=$2
 # Make sure you specify a heuristic.py for the first argument
 heuext=${heuristic##*.}
 if [[ $heuext != 'py' ]]; then
-  echo "Please specify heuristics.py first"
-  echo "Usage: $0 heuristics.py subjlist.txt"
+  echo "Please specify heuristic.py first"
+  echo "Usage: $0 heuristic.py subjlist.txt"
   exit 1
 fi
+
+# delete previous .heudiconv
+[[ -d Nifti/.heudiconv ]] && rm -rf Nifti/.heudiconv 
 
 # Run heudiconv
 # remove blank line beforehand using sed '/^$/d'
@@ -34,4 +37,9 @@ do
 	-s ${subj}  \
 	-c dcm2niix -b --overwrite 
 done
+
+# change permission
+find Nifti -type d -exec chmod 755 {} \;
+find Nifti -type f -exec chmod 644 {} \;
+
 
