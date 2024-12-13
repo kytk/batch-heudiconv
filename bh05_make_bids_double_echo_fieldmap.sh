@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to convert DICOM to BIDS using heudiconv
 # Special handling for double-echo field map data using merge.json
-# Run this script after 03_make_subjlist.sh
+# Run this script after bh03_make_subjlist.sh
 # Prerequisites: dcm2niix and heudiconv
 # K.Nemoto 13 Dec 2024
 
@@ -45,7 +45,7 @@ cd $setname
 # Check prerequisites
 if [[ ! -f $subjlist ]]; then
     echo "Error: Subject list not found: $subjlist"
-    echo "Please run 03_make_subjlist.sh first"
+    echo "Please run bh03_make_subjlist.sh first"
     exit 1
 fi
 
@@ -57,7 +57,7 @@ fi
 
 if [[ ! -d DICOM/sorted ]]; then
     echo "Error: Sorted DICOM directory not found"
-    echo "Please run 02_sort_dicom.sh first"
+    echo "Please run bh02_sort_dicom.sh first"
     exit 1
 fi
 
@@ -103,7 +103,7 @@ do
         echo "Warning: Subject ${subject}_${session} does not match double-echo fieldmap criteria"
         echo "  - Number of fieldmap directories: $ndirs (expected: 2)"
         echo "  - Number of fieldmap files: $nfiles (expected: $fmapthr)"
-        echo "Please check if this subject should be processed with 04_make_bids.sh instead"
+        echo "Please check if this subject should be processed with bh04_make_bids.sh instead"
         exit 1
     fi
 done

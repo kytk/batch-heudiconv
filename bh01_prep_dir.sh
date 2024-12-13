@@ -15,8 +15,8 @@ fi
 # First argument is a name of sequence set (e.g. MR0042)
 setname=${1%/}
 
-# Specify the path of bhqbids_00_addpath.sh
-batchpath=$(dirname $(command -v 00_addpath.sh))
+# Specify the path of bh00_addpath.sh
+batchpath=$(dirname $(command -v bh00_addpath.sh))
 
 # prepare working directory
 [[ -d $setname ]] || mkdir $setname

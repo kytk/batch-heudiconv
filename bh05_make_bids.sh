@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script to convert DICOM to BIDS using heudiconv
-# Run this script after 04_make_heuristic.sh
+# Run this script after bh04_make_heuristic.sh
 # Prerequisites: dcm2niix and heudiconv
 # K.Nemoto 13 Dec 2024
 
@@ -37,19 +37,19 @@ cd $setname
 # Check prerequisites
 if [[ ! -f $subjlist ]]; then
     echo "Error: Subject list not found: $subjlist"
-    echo "Please run 03_make_subjlist.sh first"
+    echo "Please run bh03_make_subjlist.sh first"
     exit 1
 fi
 
 if [[ ! -f $heuristic ]]; then
     echo "Error: Heuristic file not found: $heuristic"
-    echo "Please run 04_make_heuristic.sh first"
+    echo "Please run bh04_make_heuristic.sh first"
     exit 1
 fi
 
 if [[ ! -d DICOM/sorted ]]; then
     echo "Error: Sorted DICOM directory not found"
-    echo "Please run 02_sort_dicom.sh first"
+    echo "Please run bh02_sort_dicom.sh first"
     exit 1
 fi
 

@@ -15,7 +15,7 @@ fi
 setname=${1%/}
 
 # Specify the path of 00_addpath.sh
-batchpath=$(dirname $(command -v 00_addpath.sh))
+batchpath=$(dirname $(command -v bh00_addpath.sh))
 
 # Check if the directory exists
 if [[ ! -d $setname ]]; then

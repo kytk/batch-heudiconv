@@ -36,7 +36,7 @@ cd $setname
 # Check if there are sorted DICOM directories
 if [[ ! -d DICOM/sorted ]]; then
     echo "Error: DICOM/sorted directory not found"
-    echo "Please run 02_sort_dicom.sh first"
+    echo "Please run bh02_sort_dicom.sh first"
     exit 1
 fi
 

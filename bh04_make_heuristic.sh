@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script to create heuristic.py for BIDS conversion
-# Run this script after 03_make_subjlist.sh
+# Run this script after bh03_make_subjlist.sh
 # K.Nemoto 13 Dec 2024
 
 # For debugging
@@ -26,13 +26,13 @@ setname=${1%/}
 # Check prerequisites
 if [[ ! -d $setname/DICOM/sorted ]]; then
     echo "Error: Sorted DICOM directory not found"
-    echo "Please run 02_sort_dicom.sh first"
+    echo "Please run bh02_sort_dicom.sh first"
     exit 1
 fi
 
 if [[ ! -f $setname/tmp/subjlist_${setname}.tsv ]]; then
     echo "Error: Subject list not found"
-    echo "Please run 03_make_subjlist.sh first"
+    echo "Please run bh03_make_subjlist.sh first"
     exit 1
 fi
 

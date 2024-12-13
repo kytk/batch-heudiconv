@@ -20,7 +20,7 @@ cd batch-heudiconv
 
 2. Add the scripts to your PATH:
 ```bash
-./00_addpath.sh
+./bh00_addpath.sh
 ```
 
 3. Restart your terminal for the PATH changes to take effect.
@@ -34,7 +34,7 @@ The conversion process consists of five main steps:
 Create the necessary directory structure for your dataset:
 
 ```bash
-01_prep_dir.sh <setname>
+bh01_prep_dir.sh <setname>
 ```
 
 This creates:
@@ -50,7 +50,7 @@ This creates:
 After placing your DICOM directories under `DICOM/original/`, sort them:
 
 ```bash
-02_sort_dicom.sh <setname>
+bh02_sort_dicom.sh <setname>
 ```
 
 This organizes DICOM files into series-based directories.
@@ -60,7 +60,7 @@ This organizes DICOM files into series-based directories.
 Generate a subject list based on your directory naming pattern:
 
 ```bash
-03_make_subjlist.sh <setname> "<pattern>"
+bh03_make_subjlist.sh <setname> "<pattern>"
 ```
 
 Pattern examples:
@@ -73,7 +73,7 @@ Pattern examples:
 Create a heuristic file based on your DICOM structure:
 
 ```bash
-04_make_heuristic.sh <setname>
+bh04_make_heuristic.sh <setname>
 ```
 
 This analyzes your DICOM files and creates a customized heuristic file (`code/heuristic_<setname>.py`). Review and adjust the file if needed.
@@ -84,14 +84,14 @@ This analyzes your DICOM files and creates a customized heuristic file (`code/he
 For standard datasets:
 
 ```bash
-05_make_bids.sh <setname>
+bh05_make_bids.sh <setname>
 ```
 
 #### Double-Echo Fieldmap Data
 For datasets with double-echo fieldmaps:
 
 ```bash
-05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+bh05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
 ```
 
 The `fieldmap_threshold` parameter is optional (default: 78).
@@ -142,7 +142,7 @@ cd batch-heudiconv
 
 2. PATHの設定:
 ```bash
-./00_addpath.sh
+./bh00_addpath.sh
 ```
 
 3. 設定を反映させるため、ターミナルを再起動してください。
@@ -154,7 +154,7 @@ cd batch-heudiconv
 ### 1. ディレクトリ構造の準備
 
 ```bash
-01_prep_dir.sh <setname>
+bh01_prep_dir.sh <setname>
 ```
 
 以下のディレクトリが作成されます：
@@ -170,7 +170,7 @@ cd batch-heudiconv
 DICOMファイルを`DICOM/original/`に配置した後、以下を実行：
 
 ```bash
-02_sort_dicom.sh <setname>
+bh02_sort_dicom.sh <setname>
 ```
 
 ### 3. 被験者リストの作成
@@ -178,7 +178,7 @@ DICOMファイルを`DICOM/original/`に配置した後、以下を実行：
 ディレクトリ命名パターンに基づいて被験者リストを生成：
 
 ```bash
-03_make_subjlist.sh <setname> "<pattern>"
+bh03_make_subjlist.sh <setname> "<pattern>"
 ```
 
 パターン例：
@@ -191,7 +191,7 @@ DICOMファイルを`DICOM/original/`に配置した後、以下を実行：
 DICOMデータの構造に基づいてheuristicファイルを作成：
 
 ```bash
-04_make_heuristic.sh <setname>
+bh04_make_heuristic.sh <setname>
 ```
 
 このスクリプトはDICOMファイルを分析し、カスタマイズされたheuristicファイル（`code/heuristic_<setname>.py`）を作成します。必要に応じて内容を確認・調整してください。
@@ -202,14 +202,14 @@ DICOMデータの構造に基づいてheuristicファイルを作成：
 通常のデータセット用：
 
 ```bash
-05_make_bids.sh <setname>
+bh05_make_bids.sh <setname>
 ```
 
 #### Double-Echo Fieldmapデータの変換
 Double-echo fieldmapを含むデータセット用：
 
 ```bash
-05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+bh05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
 ```
 
 `fieldmap_threshold`はオプションで、デフォルトは78です。
