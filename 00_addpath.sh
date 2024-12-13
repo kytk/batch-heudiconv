@@ -1,40 +1,48 @@
 #!/bin/bash
-#A script to add this direcotry to ~/.bash_aliases or ~/.bash_profile
+# A script to add this directory to appropriate shell configuration file
 
-echo "Which OS are you using? Select number."
-select os in "Linux" "MacOS" "quit"
-do
-  if [ "$REPLY" = "q" ] ; then
-    echo "quit."
-    exit 0
-  fi
-  if [ -z "$os" ] ; then
-    continue
-  elif [ $os == "Linux" ] ; then
-    grep '# PATH for batch_heudiconv' ~/.bash_aliases > /dev/null
-    if [ $? -eq 1 ]; then
-      echo '' >> ~/.bash_aliases
-      echo '#PATH for batch_heudiconv' >> ~/.bash_aliases
-      echo "export PATH=\$PATH:$PWD" >> ~/.bash_aliases
-      echo "PATH for batch_heudiconv was added to ~/.bash_aliases"
-      echo "Please close the terminal, re-open and run checkpath.sh."
+# 13 Dec 2024 K. Nemoto
 
-      break
-    fi
+# Detect OS using uname
+OS=$(uname -s)
 
-  elif [ $os == "MacOS" ] ; then
-    grep '# PATH for batch_heudiconv' ~/.bash_profile > /dev/null
-    if [ $? -eq 1 ]; then
-      echo '' >> ~/.bash_profile
-      echo '#PATH for batch_heudiconv' >> ~/.bash_profile
-      echo "export PATH=\$PATH:$PWD" >> ~/.bash_profile
-      echo "PATH for batch_heudiconv was added to ~/.bash_profile"
-      echo "Please close the terminal, re-open and run checkpath.sh."
+case $OS in
+    "Linux")
+        CONFIG_FILE="$HOME/.bash_aliases"
+        ;;
+    "Darwin")  # macOS
+        # Detect current shell
+        CURRENT_SHELL=$(basename "$SHELL")
+        
+        case $CURRENT_SHELL in
+            "zsh")
+                CONFIG_FILE="$HOME/.zprofile"
+                ;;
+            "bash")
+                CONFIG_FILE="$HOME/.bash_profile"
+                ;;
+            *)
+                echo "Unsupported shell: $CURRENT_SHELL"
+                echo "Please manually add this directory to your shell configuration."
+                exit 1
+                ;;
+        esac
+        ;;
+    *)
+        echo "Unsupported operating system: $OS"
+        echo "This script supports only Linux and macOS."
+        exit 1
+        ;;
+esac
 
-      break
-    fi
-  elif [ $os == "quit" ] ; then
-     echo "quit."
-     exit 0
-  fi
-done
+# Check if PATH already exists in config file
+grep '# PATH for batch_heudiconv' "$CONFIG_FILE" > /dev/null
+if [ $? -eq 1 ]; then
+    echo >> "$CONFIG_FILE"
+    echo '# PATH for batch_heudiconv' >> "$CONFIG_FILE"
+    echo "export PATH=\$PATH:$PWD" >> "$CONFIG_FILE"
+    echo "PATH for batch_heudiconv was added to $CONFIG_FILE"
+    echo "Please restart your terminal or run: source $CONFIG_FILE"
+else
+    echo "PATH for batch_heudiconv already exists in $CONFIG_FILE"
+fi
