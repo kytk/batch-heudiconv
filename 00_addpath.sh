@@ -1,7 +1,7 @@
 #!/bin/bash
 # A script to add this directory to appropriate shell configuration file
 
-# 13 Dec 2024 K. Nemoto
+# K. Nemoto 13 Dec 2024
 
 # Detect OS using uname
 OS=$(uname -s)

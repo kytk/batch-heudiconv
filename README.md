@@ -1,161 +1,220 @@
 # batch-heudiconv
 
-These scripts help you generate BIDS dataset on your DICOM.
-Please follow the instructions below.
+A set of scripts to help convert DICOM files to BIDS format using heudiconv.
 
-## Required software packages
-- These scripts need the following software packages.
-    - dcm2niix
-        - dcm2niix is included in MRIcroGL https://github.com/rordenlab/MRIcroGL/releases
-        - Add the path to dcm2niix
-    - pydicom
-        - ```pip3 install pydicom``` or ```conda install pydicom``` based on your preference
-    - heudiconv
-        - ```pip3 install heudiconv```
+## Prerequisites
 
-- You have an option to use Docker. In this case, when you run the batch, please use batch_heudiconv{1,2}_docker.sh (preparing, not available yet).
+The following software packages are required:
 
-## 0. Clone this repository and add this repository to the path
-- Run the following command to clone the repository
+- **dcm2niix**: Included in [MRIcroGL](https://github.com/rordenlab/MRIcroGL/releases)
+- **pydicom**: Install via pip (`pip install pydicom`) or conda (`conda install pydicom`)
+- **heudiconv**: Install via pip (`pip install heudiconv`)
 
-    ```
-    git clone https://github.com/kytk/batch-heudiconv.git
-    cd batch-heudiconv
-    ./00_addpath.sh
-    ```
+## Installation
 
-- Close the terminal and re-run the terminal.
+1. Clone this repository:
+```bash
+git clone https://github.com/kytk/batch-heudiconv.git
+cd batch-heudiconv
+```
 
-## 1. Prepare direcotries
-- Prepare a directory (we call it "parent directory")
-- Cd to the parent directory
-- Run "01_prep_heudiconv.sh"
+2. Add the scripts to your PATH:
+```bash
+./00_addpath.sh
+```
 
-    ```
-    01_prep_heudiconv.sh
-    ```
+3. Restart your terminal for the PATH changes to take effect.
 
-- This script makes workingDir/DICOM/original and copy sample heuristic.py and subjlist*.txt from the repository
+## Usage
 
-## 2. Store DICOM directories under DICOM/original
-- Place your DICOM directories under DICOM/original. The direcoty name should be (research) ID of your participants.
+The conversion process consists of five main steps:
 
-## 3. Run DICOM sorting scripts
-- Run "02_batch_dcmsort.sh" from parentdir/workingDir
-- This script sorts DICOM files to sorted/ID/{series_number}_{series_description}
+### 1. Prepare Directory Structure
 
-## 4. Prepare a subject list
-- Analyze your participants ID. 
-    - case 1: id0001_02 where "id0001" is subject ID and "02" is the number of sessions
-        - In this case, make copies of "subjlist_sample_sessions.txt" and save as "subjects.txt"
-        - Edit the subjects.txt and change subject_ID and sessions 
+Create the necessary directory structure for your dataset:
 
-    - case 2: id0001 where "id0001" is subject ID and you don't have number of sessions in the directory
-        - In this case, make copies of "subjlist_sample_without_session.txt" and save as "subjects.txt"
+```bash
+01_prep_dir.sh <setname>
+```
 
-## 5. Prepare a heuristic.py
-- Cd to code where you see samples of heuristic.py
-- The easist way is to make a copy of heuristic_template.py and edit the file
+This creates:
+- `DICOM/original/`: Place your original DICOM files here
+- `DICOM/sorted/`: For sorted DICOM files
+- `DICOM/converted/`: Backup of processed files
+- `bids/`: BIDS-formatted output
+- `code/`: For heuristic files
+- `tmp/`: Temporary files
 
-## 6. Run batch_heudiconv.sh
-- If participant's ID includes session number, the command would be
-    ```
-    batch_heudiconv.sh code/<your heuristic.py> <subjects.txt>
-    ```
+### 2. Sort DICOM Files
 
-- If participant's ID doesn't include session number, the command would be
-   ```
-   batch_heudiconv_wo_session.sh code/<your heuristic.py> <subjects.txt>
-   ```
+After placing your DICOM directories under `DICOM/original/`, sort them:
 
-## 7. Check the directories
-- BIDS would be saved under workingDir/Nifti
+```bash
+02_sort_dicom.sh <setname>
+```
 
+This organizes DICOM files into series-based directories.
 
+### 3. Create Subject List
 
+Generate a subject list based on your directory naming pattern:
 
-- Before you run the scripts using heudiconv, sort DICOM using dcm_sort_dir.py.
-- Set path to this directory so that you can run the script.
-- Please save your dicoms under `path_to_DICOM/original/subjectid`.
-- Run the following command.
-    ```
-    cd path_to_DICOM/original
-    dcm_sort_dir subjectid
-    ```
-- sorted DICOMs will be saved in `path_to_DICOM/sorted/subjectid`.
+```bash
+03_make_subjlist.sh <setname> "<pattern>"
+```
 
-## 2. Prepare subjlist.txt
-- copy subjlist.sample.txt as subjlist.txt.
-    ```cp subjlist.sample.txt subjlist.txt```
-- You need to describe three items; directory, subject_ID, and session.
-    - directory: directory should include sujbect_ID. The simple one is directory name = subject_ID. In this case, what you write here is simply {subject}. You can include session info. In that case, what you write would be {subject}_{session}.
-    - subject_ID: describe subject ID of your samples
-    - session: If your subjects undergo MRI several times, session would be useful. If subjects undergo MRI only once, just put 01 on the session
-- The script reads the 7th line and below, so please do not delete the first 6 lines.
+Pattern examples:
+- `{subject}_{session}` for directories like "sub-001_01"
+- `{subject}-{session}` for directories like "sub-001-01"
+- `{subject}` for directories like "sub-001"
 
-## 3. Prepare heuristic.py
-- We prepare two types of heuristic.py. One assumes you don't have filedmaps, and the other assumes you have filedmaps. If you have double echo fieldmaps, you need to be careful to handle magnitude file because that image has two TE within. If you just convert the image with dcm2niix, you will have two separate brain based on two different TEs. 
+### 4. Generate Heuristic File
 
+Create a heuristic file based on your DICOM structure:
 
-### 3.1. Case 1. You don't have fieldmaps
-- Please use heuristic_template10_wo_filedmaps.py in "code" directory.
-    ```
-    cd code
-    cp heuristic_template10_wo_filedmaps.py heuristic.py
-    ```
-- Please look at lines 19-56.
-    - Here you list keys for the images you want to convert.
-    - Based on the images you want to convert, please modify the lines.
-    - Make sure you have all elements in the line 56.
-- Then please look at lines 88-131.
-    - Here you describe the condition to identify the specific sequence.
-    - If you have sorted your DICOMs beforehand with dcm_sort_dir.py, your DICOM images are already sorted and the name of subdirectories include series description. So it would be easy to decide the series you want to convert.
-    - Please replace 'dir_name_for_[sequence]' with the series description of your images.
-        - Suppose your T1 images are stored in 'T1_MPR'. In this case, replace 'dir_name_for_T1' with 'T1_MPR'.
+```bash
+04_make_heuristic.sh <setname>
+```
 
-### 3.2 Case 2. You have double echo fieldmaps
-- Please use heuristic_template2*.py in "code" directory.
-    ```
-    cd code
-    cp heuristic_template21_wo_mag.py heuristic1.py
-    cp heuristic_template22_mag.py heuristic2.py
-    ```
+This analyzes your DICOM files and creates a customized heuristic file (`code/heuristic_<setname>.py`). Review and adjust the file if needed.
 
-- Please open heuristic1.py.
-    - look at lines 19-56 of heuristic1.py.
-    - Here you list keys for the images you want to convert.
-    - Based on the images you want to convert, please modify the lines.
-    - Make sure you have all elements in the line 56.
-- Then please look at lines 88-131 of heuristic1.py.
-    - Here you describe the condition to identify the specific sequence.
-    - If you have sorted your DICOMs beforehand with dcm_sort_dir.py, your DICOM images are already sorted and the name of subdirectories include series description. So it would be easy to decide the series you want to convert.
-    - Please replace 'dir_name_for_[sequence]' with the series description of your images.
-        - Suppose your T1 images are stored in 'T1_MPR'. In this case, replace 'dir_name_for_T1' with 'T1_MPR'.
+### 5. Convert to BIDS
 
-- After looking through heuristic1.py Please open heuristic2.py.
-    - look at line 24 of heuristic2.py.
-    - Please confirm the key is right (basically you don't have to anything).
-- Then please look at lines 67-87.
-    - replace 'dir_name_for_fieldmap_magnitude' with the series description of your images.
+#### Standard Conversion
+For standard datasets:
 
-## 4.1. Case 1. You don't have fieldmaps
-- Please run the batch_heudiconv1.sh.
-    ```
-    batch_heudiconv1.sh heuristic.py subjlist.txt
-    ```
-    - This will generate BIDS structure for you. Now you are ready to check your BIDS with [BIDS_validator](https://bids-standard.github.io/bids-validator/).
+```bash
+05_make_bids.sh <setname>
+```
 
-## 4.2. Case 2. You have double echo fieldmaps
-- Please run the batch_heudiconv1.sh with heuristic1.py.
-    ```
-    batch_heudiconv1.sh heuristic1.py subjlist.txt
-    ```
-    - This will generate BIDS structure except for magnitude image.
+#### Double-Echo Fieldmap Data
+For datasets with double-echo fieldmaps:
 
-- Then run the batch_heudiconv2.sh with heuristic2.py.
-    ```
-    batch_heudiconv2.sh heuristic2.py subjlist.txt
-    ```
-    - This will generate BIDS structure for magnitude image.
+```bash
+05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+```
 
-- Now you are ready to check your BIDS with [BIDS_validator](https://bids-standard.github.io/bids-validator/).
+The `fieldmap_threshold` parameter is optional (default: 78).
+
+## Directory Structure
+
+After running the scripts, your directory structure will look like this:
+
+```
+setname/
+├── code/
+│   └── heuristic_setname.py
+├── DICOM/
+│   ├── original/     # Original DICOM files
+│   ├── sorted/       # Sorted DICOM files
+│   └── converted/    # Backup of processed files
+├── bids/            # BIDS-formatted output
+│   ├── sub-{subject}/
+│   └── derivatives/
+└── tmp/             # Temporary files
+```
+
+## Heuristic File
+
+The heuristic file (`heuristic_setname.py`) defines how your sequences should be converted to BIDS format. While `04_make_heuristic.sh` creates an initial version automatically, you may need to adjust it for your specific needs. Sample heuristic files are provided in the `code` directory.
+
+---
+
+# 日本語説明
+
+## batch-heudiconv とは
+
+DICOMファイルをBIDS形式に変換するためのスクリプト群です。heudiconvを使用して、効率的にデータを変換します。
+
+## 必要なソフトウェア
+
+- **dcm2niix**: [MRIcroGL](https://github.com/rordenlab/MRIcroGL/releases)に含まれています
+- **pydicom**: `pip install pydicom`もしくは`conda install pydicom`でインストール
+- **heudiconv**: `pip install heudiconv`でインストール
+
+## インストール方法
+
+1. リポジトリのクローン:
+```bash
+git clone https://github.com/kytk/batch-heudiconv.git
+cd batch-heudiconv
+```
+
+2. PATHの設定:
+```bash
+./00_addpath.sh
+```
+
+3. 設定を反映させるため、ターミナルを再起動してください。
+
+## 使用方法
+
+変換は5つの主要なステップで構成されています：
+
+### 1. ディレクトリ構造の準備
+
+```bash
+01_prep_dir.sh <setname>
+```
+
+以下のディレクトリが作成されます：
+- `DICOM/original/`: 元のDICOMファイルを配置
+- `DICOM/sorted/`: ソートされたDICOMファイル用
+- `DICOM/converted/`: 処理済みファイルのバックアップ
+- `bids/`: BIDS形式の出力
+- `code/`: heuristicファイル用
+- `tmp/`: 一時ファイル用
+
+### 2. DICOMファイルのソート
+
+DICOMファイルを`DICOM/original/`に配置した後、以下を実行：
+
+```bash
+02_sort_dicom.sh <setname>
+```
+
+### 3. 被験者リストの作成
+
+ディレクトリ命名パターンに基づいて被験者リストを生成：
+
+```bash
+03_make_subjlist.sh <setname> "<pattern>"
+```
+
+パターン例：
+- `{subject}_{session}`: "sub-001_01"形式
+- `{subject}-{session}`: "sub-001-01"形式
+- `{subject}`: "sub-001"形式
+
+### 4. Heuristicファイルの生成
+
+DICOMデータの構造に基づいてheuristicファイルを作成：
+
+```bash
+04_make_heuristic.sh <setname>
+```
+
+このスクリプトはDICOMファイルを分析し、カスタマイズされたheuristicファイル（`code/heuristic_<setname>.py`）を作成します。必要に応じて内容を確認・調整してください。
+
+### 5. BIDS形式への変換
+
+#### 標準的な変換
+通常のデータセット用：
+
+```bash
+05_make_bids.sh <setname>
+```
+
+#### Double-Echo Fieldmapデータの変換
+Double-echo fieldmapを含むデータセット用：
+
+```bash
+05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+```
+
+`fieldmap_threshold`はオプションで、デフォルトは78です。
+
+## Heuristicファイル
+
+heuristicファイル（`heuristic_setname.py`）は、各シーケンスをどのようにBIDS形式に変換するかを定義します。`04_make_heuristic.sh`で自動生成された初期バージョンを、必要に応じて調整してください。サンプルファイルが`code`ディレクトリに用意されています。
+
