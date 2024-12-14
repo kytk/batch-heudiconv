@@ -88,15 +88,15 @@ echo "Setting permissions..."
 find bids -type d -exec chmod 755 {} \;
 find bids -type f -exec chmod 644 {} \;
 
-## Backup DICOM files
-#echo "Backing up DICOM files..."
-#cp -ar DICOM/sorted/ DICOM/converted/
-#cp -ar DICOM/original/ DICOM/converted/
-#
-## Clean up
-#echo "Cleaning up..."
-#rm -rf DICOM/sorted/*
-#rm -rf DICOM/original/*
+# Backup DICOM files
+echo "Backing up DICOM files..."
+cp -ar DICOM/sorted/ DICOM/converted/
+cp -ar DICOM/original/ DICOM/converted/
+
+# Clean up
+echo "Cleaning up..."
+rm -rf DICOM/sorted/*
+rm -rf DICOM/original/*
 
 echo "BIDS conversion completed"
 echo "- BIDS data is in: bids/"
