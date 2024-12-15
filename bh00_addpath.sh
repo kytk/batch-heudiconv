@@ -36,13 +36,13 @@ case $OS in
 esac
 
 # Check if PATH already exists in config file
-grep '# PATH for batch_heudiconv' "$CONFIG_FILE" > /dev/null
+grep '# PATH for batch-heudiconv' "$CONFIG_FILE" > /dev/null
 if [ $? -eq 1 ]; then
     echo >> "$CONFIG_FILE"
-    echo '# PATH for batch_heudiconv' >> "$CONFIG_FILE"
+    echo '# PATH for batch-heudiconv' >> "$CONFIG_FILE"
     echo "export PATH=\$PATH:$PWD" >> "$CONFIG_FILE"
-    echo "PATH for batch_heudiconv was added to $CONFIG_FILE"
+    echo "PATH for batch-heudiconv was added to $CONFIG_FILE"
     echo "Please restart your terminal or run: source $CONFIG_FILE"
 else
-    echo "PATH for batch_heudiconv already exists in $CONFIG_FILE"
+    echo "PATH for batch-heudiconv already exists in $CONFIG_FILE"
 fi
