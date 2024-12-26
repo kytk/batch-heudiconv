@@ -1,5 +1,5 @@
 # heuristic.py for HARP protocol
-# 17 Feb 2023 K. Nemoto
+# 27 Dec 2024 K. Nemoto
 
 import os, re
 
@@ -26,12 +26,16 @@ def infotodict(seqinfo):
     t1w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T1w')
     t2w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T2w')
     func_rest_PA = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-PA_task-rest_run-{item:02d}_bold')
+    func_rest_PA_sbref = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-PA_task-rest_run-{item:02d}_sbref')
     func_rest_AP = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-AP_task-rest_run-{item:02d}_bold')
+    func_rest_AP_sbref = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-AP_task-rest_run-{item:02d}_sbref')
     dwi_PA = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_dwi')
+    dwi_PA_sbref = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_sbref')
     dwi_AP = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_dwi')
+    dwi_AP_sbref = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_sbref')
     fmap_PA =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-PA_run-{item:02d}_fieldmap')
     fmap_AP =  create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-AP_run-{item:02d}_fieldmap')
-    info = {t1w: [], t2w: [], func_rest_PA: [], func_rest_AP: [], dwi_PA: [], dwi_AP: [], fmap_PA: [], fmap_AP: []}
+    info = {t1w: [], t2w: [], func_rest_PA: [], func_rest_PA_sbref: [], func_rest_AP: [], func_rest_AP_sbref: [], dwi_PA: [], dwi_PA_sbref: [], dwi_AP: [], dwi_AP_sbref: [], fmap_PA: [], fmap_AP: []}
 
 #######################################################################################################################
 
@@ -61,7 +65,7 @@ def infotodict(seqinfo):
         * image_type
         """
 
-##### extract keywords from sorted DICOM series-based sub-directories ##########
+##### extract keywords from sorted DICOM series-based sub-directories #####
 
         if 'T1_MPR' in s.dcm_dir_name:
             info[t1w].append(s.series_id)
@@ -69,17 +73,25 @@ def infotodict(seqinfo):
             info[t2w].append(s.series_id)
         if ('BOLD_REST' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and (s.dim4 >= 200):    
             info[func_rest_PA].append(s.series_id)
+        if ('BOLD_REST' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+            info[func_rest_PA_sbref].append(s.series_id)
         if ('BOLD_REST' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and (s.dim4 >= 200):    
             info[func_rest_AP].append(s.series_id)
+        if ('BOLD_REST' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+            info[func_rest_AP_sbref].append(s.series_id)
         if ('DWI_PA' in s.dcm_dir_name) and (s.dim4 >= 30):    
             info[dwi_PA].append(s.series_id)
+        if ('DWI_PA' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+            info[dwi_PA_sbref].append(s.series_id)
         if ('DWI_AP' in s.dcm_dir_name) and (s.dim4 >= 30):    
             info[dwi_AP].append(s.series_id)
+        if ('DWI_AP' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+            info[dwi_AP_sbref].append(s.series_id)
         if ('SEField' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name):    
             info[fmap_PA].append(s.series_id)
         if ('SEField' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name):    
             info[fmap_AP].append(s.series_id)
 
-################################################################################
+###########################################################################
             
     return info
