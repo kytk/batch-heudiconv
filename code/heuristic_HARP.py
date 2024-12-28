@@ -71,13 +71,29 @@ def infotodict(seqinfo):
             info[t1w].append(s.series_id)
         if 'T2_SPC' in s.dcm_dir_name:
             info[t2w].append(s.series_id)
-        if ('BOLD_REST' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and (s.dim4 >= 200):    
+        if (
+            ('BOLD_REST' in s.dcm_dir_name) 
+            and ('PA' in s.dcm_dir_name) 
+            and (s.dim4 >= 200)
+           ):    
             info[func_rest_PA].append(s.series_id)
-        if ('BOLD_REST' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+        if (
+            ('BOLD_REST' in s.dcm_dir_name) 
+            and ('PA' in s.dcm_dir_name)
+            and ('SBRef' in s.dcm_dir_name)
+           ):    
             info[func_rest_PA_sbref].append(s.series_id)
-        if ('BOLD_REST' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and (s.dim4 >= 200):    
+        if (
+            ('BOLD_REST' in s.dcm_dir_name) 
+            and ('AP' in s.dcm_dir_name) 
+            and (s.dim4 >= 200)
+           ):    
             info[func_rest_AP].append(s.series_id)
-        if ('BOLD_REST' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):    
+        if (
+            ('BOLD_REST' in s.dcm_dir_name) 
+            and ('AP' in s.dcm_dir_name) 
+            and ('SBRef' in s.dcm_dir_name)
+           ):    
             info[func_rest_AP_sbref].append(s.series_id)
         if ('DWI_PA' in s.dcm_dir_name) and (s.dim4 >= 30):    
             info[dwi_PA].append(s.series_id)

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Script to sort DICOM files using dcm_sort_dir.py
-# K.Nemoto 13 Dec 2024
+# Script to sort DICOM files using bh_dcm_sort_dir.py
+# K.Nemoto 28 Dec 2024
 
 # For debugging
 #set -x
@@ -47,7 +47,7 @@ done
 # Sort DICOM files
 echo "Sorting DICOM files..."
 cd DICOM/original
-${batchpath}/dcm_sort_dir.py *
+${batchpath}/bh_dcm_sort_dir.py *
 
 # Move sorted files to the correct location
 echo "Moving sorted files to DICOM/sorted/"

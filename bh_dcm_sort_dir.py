@@ -3,9 +3,9 @@
 
 # DICOM sorting script using pydicom
 # Part of this script is based on the script provided by Yuya Saito
-# Prerequisite: pydicom
+# Prerequisite: pydicom and numpy
 
-# 15 May 2024 K. Nemoto
+# 28 Dec 2024 K. Nemoto
 
 import os
 import time
@@ -14,7 +14,7 @@ import shutil
 import argparse
 import pydicom
 
-__version__ = '20240515'
+__version__ = '20241228'
 
 __desc__ = '''
 Sort DICOM files.
@@ -33,6 +33,9 @@ def generate_dest_dir_name(dicom_dataset: pydicom.dataset.FileDataset) -> str:
     return re.sub(r'[(\\/:?*"<>|)]', '', rule_text)
 
 def copy_dicom_files(src_dir: str, sorted_dir: str = '../sorted/') -> None:
+    # Strip trailing slashes from the source directory
+    src_dir = src_dir.rstrip('/')
+    
     if not os.path.exists(sorted_dir):
         os.makedirs(sorted_dir)
 
