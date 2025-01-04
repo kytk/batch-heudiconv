@@ -68,7 +68,7 @@ Pattern examples:
 - `{subject}-{session}` for directories like "sub-001-01"
 - `{subject}` for directories like "sub-001"
 
-### 4. Generate Heuristic File
+### 4. Generate Heuristic File (still alpha version)
 
 Create a heuristic file based on your DICOM structure:
 
@@ -76,7 +76,7 @@ Create a heuristic file based on your DICOM structure:
 bh04_make_heuristic.sh <setname>
 ```
 
-This analyzes your DICOM files and creates a customized heuristic file (`code/heuristic_<setname>.py`). Review and adjust the file if needed.
+This analyzes your DICOM files and creates a customized heuristic file (`code/heuristic_<setname>.py`). Review and adjust the file if needed. (This has to be edited.)
 
 ### 5. Convert to BIDS
 
@@ -186,7 +186,7 @@ bh03_make_subjlist.sh <setname> "<pattern>"
 - `{subject}-{session}`: "sub-001-01"形式
 - `{subject}`: "sub-001"形式
 
-### 4. Heuristicファイルの生成
+### 4. Heuristicファイルの生成 (α版)
 
 DICOMデータの構造に基づいてheuristicファイルを作成：
 
@@ -194,7 +194,7 @@ DICOMデータの構造に基づいてheuristicファイルを作成：
 bh04_make_heuristic.sh <setname>
 ```
 
-このスクリプトはDICOMファイルを分析し、カスタマイズされたheuristicファイル（`code/heuristic_<setname>.py`）を作成します。必要に応じて内容を確認・調整してください。
+このスクリプトはDICOMファイルを分析し、カスタマイズされたheuristicファイル（`code/heuristic_<setname>.py`）を作成します。必要に応じて内容を確認・調整してください。まだこのスクリプトは改良が必要な状況です。
 
 ### 5. BIDS形式への変換
 
