@@ -69,7 +69,7 @@ do
     
     # Run heudiconv
     heudiconv -d "$dicom_pattern" \
-              -o bids \
+              -o bids/rawdata \
               -f "$heuristic" \
               -s "$subject" \
               -ss "$session" \
@@ -85,8 +85,8 @@ done
 
 # Set appropriate permissions
 echo "Setting permissions..."
-find bids -type d -exec chmod 755 {} \;
-find bids -type f -exec chmod 644 {} \;
+find bids/rawdata -type d -exec chmod 755 {} \;
+find bids/rawdata -type f -exec chmod 644 {} \;
 
 # Backup DICOM files
 echo "Backing up DICOM files..."

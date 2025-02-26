@@ -28,6 +28,7 @@ declare -a dirs=(
     "DICOM/sorted"
     "DICOM/converted"
     "bids/derivatives"
+    "bids/rawdata"
     "tmp"
     "code"
 )
