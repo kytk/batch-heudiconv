@@ -90,8 +90,10 @@ find bids/rawdata -type f -exec chmod 644 {} \;
 
 # Backup DICOM files
 echo "Backing up DICOM files..."
-cp -ar DICOM/sorted/ DICOM/converted/
-cp -ar DICOM/original/ DICOM/converted/
+#cp -ar DICOM/sorted/ DICOM/converted/
+#cp -ar DICOM/original/ DICOM/converted/
+mv DICOM/sorted DICOM/converted/
+mv DICOM/original DICOM/converted/
 
 # Clean up
 echo "Cleaning up..."
