@@ -60,10 +60,6 @@ for dir in sorted_tmp/*; do
 done
 rm -rf sorted_tmp 2>/dev/null
 
-#remove real and imaginary fieldmaps from sorted
-find DICOM/sorted -type d -name '*real' -exec rm -rf {} \;
-find DICOM/sorted -type d -name '*imaginary' -exec rm -rf {} \;
-
 echo "DICOM sorting completed:"
 echo "- Original files remain in: DICOM/original/"
 echo "- Sorted files are in: DICOM/sorted/"
