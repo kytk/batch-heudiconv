@@ -2,6 +2,7 @@
 # K. Nemoto 17 Apr 2025
 
 import os
+import json
 
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
@@ -51,11 +52,15 @@ def infotodict(seqinfo):
     #fmap_AP =  create_key('sub-{subject}/fmap/sub-{subject}_dir-AP_fieldmap')
 
     # Field map (magnitude and field: GE)
-    fmap_mag =  create_key('sub-{subject}/fmap/sub-{subject}_magnitude')
-    fmap_phase = create_key('sub-{subject}/fmap/sub-{subject}_phase')
+    fmap_mag1 =  create_key('sub-{subject}/fmap/sub-{subject}_magnitude1')
+    fmap_mag2 =  create_key('sub-{subject}/fmap/sub-{subject}_magnitude2')
+    fmap_phase1 = create_key('sub-{subject}/fmap/sub-{subject}_phase1')
+    fmap_phase2 = create_key('sub-{subject}/fmap/sub-{subject}_phase2')
     
 
-    info = {t1w: [], func_rest: [], dwi: [], fmap_mag: [], fmap_phase: []}
+    info = {t1w: [], func_rest: [], dwi: [], 
+            fmap_mag1: [], fmap_phase1: [],
+            fmap_mag2: [], fmap_phase2: []}
 
     ############################################################################
 
@@ -127,10 +132,81 @@ def infotodict(seqinfo):
         #    info[fmap_AP].append(s.series_id)
 
         # Fieldmap (magnitude and phase: GE)
-        if 'SPGR_TE' in s.dcm_dir_name and 'magnitude' in s.dcm_dir_name:
-            info[fmap_mag].append(s.series_id)
-
-        if 'SPGR_TE' in s.dcm_dir_name and 'phase' in s.dcm_dir_name:
-            info[fmap_field].append(s.series_id)
+        # Do not classify anything here - let heudiconv convert everything first
+        # The classification will be done in the MetadataExtras
+        if '2D-field_map1' in s.dcm_dir_name:
+            # Temporary placeholder - this will create all files
+            info[fmap_mag1].append(s.series_id)
+        
+        if '2D-field_map2' in s.dcm_dir_name:
+            # Temporary placeholder - this will create all files  
+            info[fmap_mag2].append(s.series_id)
 
     return info
+
+# Add metadata extractor function to handle the post-processing
+def MetadataExtras(outdict):
+    """Add additional metadata and reorganize fieldmap files"""
+    import shutil
+    import glob
+    
+    # Find all fmap files
+    fmap_dir = os.path.join(os.path.dirname(outdict.get('anat', [])[0] if 'anat' in outdict else '.'), 'fmap')
+    
+    if os.path.exists(fmap_dir):
+        files = glob.glob(os.path.join(fmap_dir, '*.json'))
+        
+        for json_file in files:
+            base_name = json_file[:-5]  # Remove .json
+            nii_file = base_name + '.nii.gz'
+            
+            try:
+                # Read JSON to check ImageType
+                with open(json_file, 'r') as f:
+                    metadata = json.load(f)
+                    
+                if 'ImageType' in metadata:
+                    image_type_list = metadata['ImageType']
+                    if isinstance(image_type_list, list) and len(image_type_list) > 0:
+                        last_type = str(image_type_list[-1]).upper()
+                        
+                        # Determine echo number from file name
+                        echo = ''
+                        if 'magnitude11' in json_file or 'magnitude12' in json_file or \
+                           'magnitude13' in json_file or 'magnitude14' in json_file:
+                            echo = '1'
+                        elif 'magnitude21' in json_file or 'magnitude22' in json_file or \
+                             'magnitude23' in json_file or 'magnitude24' in json_file:
+                            echo = '2'
+                        
+                        # Rename file based on type
+                        if 'MAGNITUDE' in last_type and echo:
+                            new_json = json_file.replace(f'magnitude{echo}', f'magnitude{echo}')
+                            new_nii = nii_file.replace(f'magnitude{echo}', f'magnitude{echo}')
+                        elif 'PHASE' in last_type and echo:
+                            # Extract the sequence number (11, 12, etc)
+                            import re
+                            match = re.search(r'magnitude(\d\d)', os.path.basename(json_file))
+                            if match:
+                                seq_num = match.group(1)[1]  # Get second digit (1, 2, 3, 4)
+                                new_json = json_file.replace(f'magnitude{echo}{seq_num}', f'phase{echo}')
+                                new_nii = nii_file.replace(f'magnitude{echo}{seq_num}', f'phase{echo}')
+                        else:
+                            # Keep original names for non-fieldmap files
+                            continue
+                        
+                        # Rename the files if needed
+                        if new_json != json_file:
+                            if os.path.exists(new_json):
+                                os.remove(new_json)
+                            shutil.move(json_file, new_json)
+                            
+                        if new_nii != nii_file and os.path.exists(nii_file):
+                            if os.path.exists(new_nii):
+                                os.remove(new_nii)
+                            shutil.move(nii_file, new_nii)
+                            
+            except Exception as e:
+                print(f"Error processing {json_file}: {e}")
+    
+    return None
