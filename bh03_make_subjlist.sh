@@ -1,18 +1,25 @@
 #!/bin/bash
 # Script to create subject list for BIDS conversion
-# Run this script after 02_sort_dicom.sh
-# K.Nemoto 13 Dec 2024
+# Run this script after bh02_sort_dicom.sh
+# K.Nemoto 24 May 2025
 
 # For debugging
 #set -x
 
 usage() {
-    echo "Create subject list from directory names using specified pattern"
-    echo "Usage: $0 <setname> <pattern>"
-    echo "Patterns examples:"
-    echo "  {subject}_{session}  - For directories like 'id0001_01'"
-    echo "  {subject}-{session}  - For directories like 'id0001-01'"
-    echo "  {subject}           - For directories like 'id0001'"
+    echo "Create subject list from directory names for your study"
+    echo "Usage: $0 <study_name> <pattern>"
+    echo ""
+    echo "Pattern examples:"
+    echo "  '{subject}_{session}'  - For directories like 'sub001_ses01'"
+    echo "  '{subject}-{session}'  - For directories like 'sub001-ses01'"
+    echo "  '{subject}'           - For directories like 'sub001' (single session)"
+    echo ""
+    echo "Prerequisites:"
+    echo "  - Study directory created with: bh01_prep_dir.sh <study_name>"
+    echo "  - DICOM files sorted with: bh02_sort_dicom.sh <study_name>"
+    echo ""
+    echo "This creates: <study_name>/tmp/subjlist_<study_name>.tsv"
     exit 1
 }
 
@@ -21,22 +28,22 @@ if [[ $# -lt 2 ]]; then
 fi
 
 # Parameters
-setname=${1%/}
+study_name=${1%/}
 pattern=$2
 
-# Check if setname directory exists
-if [[ ! -d $setname ]]; then
-    echo "Error: Directory $setname does not exist"
-    echo "Please run 01_prep_dir.sh first"
+# Check if study directory exists
+if [[ ! -d $study_name ]]; then
+    echo "Error: Study directory '$study_name' does not exist"
+    echo "Please run: bh01_prep_dir.sh $study_name"
     exit 1
 fi
 
-cd $setname
+cd $study_name
 
 # Check if there are sorted DICOM directories
 if [[ ! -d DICOM/sorted ]]; then
     echo "Error: DICOM/sorted directory not found"
-    echo "Please run bh02_sort_dicom.sh first"
+    echo "Please run: bh02_sort_dicom.sh $study_name"
     exit 1
 fi
 
@@ -54,41 +61,58 @@ extract_info() {
         if [[ $dirname =~ ^(.*)_([^_]*)$ ]]; then
             subject="${BASH_REMATCH[1]}"
             session="${BASH_REMATCH[2]}"
-            echo -e "{subject}_{session}\t$subject\t$session"
+            echo -e "$dirname\t$subject\t$session"
+        fi
+    elif [[ "$pattern" == *"{subject}-{session}"* ]]; then
+        # For patterns with session, split on the last hyphen
+        if [[ $dirname =~ ^(.*)-([^-]*)$ ]]; then
+            subject="${BASH_REMATCH[1]}"
+            session="${BASH_REMATCH[2]}"
+            echo -e "$dirname\t$subject\t$session"
         fi
     else
         # For patterns without session, use the whole name as subject
         if [[ $dirname =~ ^(.*)$ ]]; then
             subject="${BASH_REMATCH[1]}"
-            echo -e "{subject}\t$subject\t01"  # Default session to "01"
+            echo -e "$dirname\t$subject\t01"  # Default session to "01"
         fi
     fi
 }
 
 # Create header for subject list
-echo -e "directory\tsubject_ID\tsession" > "tmp/subjlist_${setname}.tsv"
+subjlist_file="tmp/subjlist_${study_name}.tsv"
+echo -e "directory\tsubject_ID\tsession" > "$subjlist_file"
 
 # Process each directory
 for dir in DICOM/sorted/*; do
     if [[ -d $dir ]]; then
         dirname=$(basename "$dir")
-        extract_info "$dirname" "$pattern" >> "tmp/subjlist_${setname}.tsv"
+        extract_info "$dirname" "$pattern" >> "$subjlist_file"
     fi
 done
 
 # Check if any subjects were found
-if [[ $(wc -l < "tmp/subjlist_${setname}.tsv") -le 1 ]]; then
+if [[ $(wc -l < "$subjlist_file") -le 1 ]]; then
     echo "Error: No matching directories found with pattern: $pattern"
-    echo "Available directories:"
+    echo ""
+    echo "Available directories in DICOM/sorted/:"
     ls -1 DICOM/sorted/
-    rm "tmp/subjlist_${setname}.tsv"
+    echo ""
+    echo "Common patterns:"
+    echo "  - If directories are like 'sub001_ses01': use '{subject}_{session}'"
+    echo "  - If directories are like 'sub001': use '{subject}'"
+    rm "$subjlist_file"
     exit 1
 fi
 
-echo "Subject list has been created: tmp/subjlist_${setname}.tsv"
-echo "Content of the subject list:"
-cat "tmp/subjlist_${setname}.tsv"
-echo
-echo "Please verify the subject list before proceeding with BIDS conversion."
+echo "Subject list created successfully: $subjlist_file"
+echo ""
+echo "Content preview:"
+cat "$subjlist_file"
+echo ""
+echo "Study: $study_name"
+echo "Subjects found: $(($(wc -l < "$subjlist_file") - 1))"
+echo ""
+echo "Next step: Create heuristic file with: bh04_make_heuristic.sh $study_name"
 
 exit 0

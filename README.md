@@ -1,6 +1,14 @@
 # batch-heudiconv
 
-A set of scripts to help convert DICOM files to BIDS format using heudiconv.
+A set of scripts to help convert DICOM files to BIDS format using heudiconv. Each study is managed as a self-contained workspace with organized directory structure.
+
+## Key Features
+
+✅ **Study-based organization**: Each research study gets its own workspace  
+✅ **Automated heuristic generation**: Creates study-specific conversion rules  
+✅ **Step-by-step workflow**: Clear progression from DICOM to BIDS  
+✅ **Multi-vendor support**: Works with Siemens, GE, and Philips scanners  
+✅ **Backup & safety**: Preserves original data throughout the process  
 
 ## Prerequisites
 
@@ -25,98 +33,210 @@ cd batch-heudiconv
 
 3. Restart your terminal for the PATH changes to take effect.
 
-## Usage
+## Usage Workflow
 
-The conversion process consists of five main steps:
+The conversion process consists of five main steps. Each study is processed independently in its own directory.
 
-### 1. Prepare Directory Structure
+### 1. 🏗️ Prepare Study Workspace
 
-Create the necessary directory structure for your dataset:
-
-```bash
-bh01_prep_dir.sh <setname>
-```
-
-This creates:
-- `DICOM/original/`: Place your original DICOM files here
-- `DICOM/sorted/`: For sorted DICOM files
-- `DICOM/converted/`: Backup of processed files
-- `bids/`: BIDS-formatted output
-- `code/`: For heuristic files
-- `tmp/`: Temporary files
-
-### 2. Sort DICOM Files
-
-After placing your DICOM directories under `DICOM/original/`, sort them:
+Create a complete workspace for your research study:
 
 ```bash
-bh02_sort_dicom.sh <setname>
+bh01_prep_dir.sh <study_name>
 ```
 
-This organizes DICOM files into series-based directories.
+**Examples:**
+```bash
+bh01_prep_dir.sh resting_state_2024     # Creates organized workspace
+bh01_prep_dir.sh pilot_dwi_study        # For diffusion study
+bh01_prep_dir.sh longitudinal_cohort    # For multi-session study
+```
 
-### 3. Create Subject List
+This creates a structured workspace:
+```
+your_study_name/
+├── DICOM/
+│   ├── original/     # Place your DICOM files here
+│   ├── sorted/       # For organized DICOM files
+│   └── converted/    # Backup location
+├── bids/
+│   ├── rawdata/      # Final BIDS output
+│   └── derivatives/  # For processed data
+├── code/             # Study-specific heuristic files
+└── tmp/              # Working files
+```
+
+### 2. 🗂️ Sort DICOM Files
+
+After placing your DICOM directories under `DICOM/original/`, organize them by series:
+
+```bash
+bh02_sort_dicom.sh <study_name>
+```
+
+This script:
+- Organizes DICOM files by series number and description
+- Cleans up filenames (replaces spaces with underscores)
+- Creates a structure ready for heudiconv processing
+
+### 3. 📋 Create Subject List
 
 Generate a subject list based on your directory naming pattern:
 
 ```bash
-bh03_make_subjlist.sh <setname> "<pattern>"
+bh03_make_subjlist.sh <study_name> "<pattern>"
 ```
 
-Pattern examples:
-- `{subject}_{session}` for directories like "sub-001_01"
-- `{subject}-{session}` for directories like "sub-001-01"
-- `{subject}` for directories like "sub-001"
+**Pattern Examples:**
+```bash
+# For directories like "sub001_ses01":
+bh03_make_subjlist.sh my_study "{subject}_{session}"
 
-### 4. Generate Heuristic File (still alpha version)
+# For directories like "sub001-ses01":
+bh03_make_subjlist.sh my_study "{subject}-{session}"
 
-Create a heuristic file based on your DICOM structure:
+# For single-session directories like "sub001":
+bh03_make_subjlist.sh my_study "{subject}"
+```
+
+### 4. ⚙️ Generate Study-Specific Heuristic
+
+Create a heuristic file tailored to your study's DICOM structure:
 
 ```bash
-bh04_make_heuristic.sh <setname>
+bh04_make_heuristic.sh <study_name>
 ```
 
-This analyzes your DICOM files and creates a customized heuristic file (`code/heuristic_<setname>.py`). Review and adjust the file if needed. (This has to be edited.)
+This script:
+- Analyzes your DICOM files automatically
+- Identifies sequence types (T1w, fMRI, DWI, fieldmaps)
+- Creates `code/heuristic_<study_name>.py`
+- Provides sequence-specific conversion rules
 
-### 5. Convert to BIDS
+**Review the generated heuristic file** and adjust if needed for your specific sequences.
+
+### 5. 🎯 Convert to BIDS
 
 #### Standard Conversion
-For standard datasets:
+For most datasets:
 
 ```bash
-bh05_make_bids.sh <setname>
+bh05_make_bids.sh <study_name>
 ```
 
 #### Double-Echo Fieldmap Data
 For datasets with double-echo fieldmaps:
 
 ```bash
-bh05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+bh05_make_bids_double_echo_fieldmap.sh <study_name> [fieldmap_threshold]
 ```
 
 The `fieldmap_threshold` parameter is optional (default: 78).
 
-## Directory Structure
+## Study Directory Structure
 
-After running the scripts, your directory structure will look like this:
+After running the scripts, each study will have this structure:
 
 ```
-setname/
+study_name/
 ├── code/
-│   └── heuristic_setname.py
+│   └── heuristic_study_name.py     # Study-specific conversion rules
 ├── DICOM/
-│   ├── original/     # Original DICOM files
-│   ├── sorted/       # Sorted DICOM files
-│   └── converted/    # Backup of processed files
-├── bids/            # BIDS-formatted output
-│   ├── sub-{subject}/
-│   └── derivatives/
-└── tmp/             # Temporary files
+│   ├── original/                   # Original DICOM files (archived)
+│   ├── sorted/                     # Series-organized DICOM (archived)  
+│   └── converted/                  # Backup of processed files
+├── bids/
+│   ├── rawdata/                    # 📂 Your BIDS dataset is here!
+│   │   ├── sub-001/
+│   │   ├── sub-002/
+│   │   ├── dataset_description.json
+│   │   └── ...
+│   └── derivatives/                # For processed data
+└── tmp/
+    └── subjlist_study_name.tsv     # Subject list for this study
 ```
 
-## Heuristic File
+## Advanced Features
 
-The heuristic file (`heuristic_setname.py`) defines how your sequences should be converted to BIDS format. While `04_make_heuristic.sh` creates an initial version automatically, you may need to adjust it for your specific needs. Sample heuristic files are provided in the `code` directory.
+### Post-processing Scripts
+
+**Fix IntendedFor fields for fieldmaps:**
+```bash
+bh06_fix_intendedfor.py <study_name>
+```
+
+**Reorganize GE fieldmap files:**
+```bash
+bh06_reorganize_fieldmaps.py <study_name>
+```
+
+### Managing Multiple Studies
+
+You can work on multiple studies simultaneously:
+
+```bash
+# Set up different studies
+bh01_prep_dir.sh autism_rsfmri_2024
+bh01_prep_dir.sh depression_longitudinal  
+bh01_prep_dir.sh pilot_connectivity
+
+# Each study has its own workspace and settings
+ls -la
+# autism_rsfmri_2024/
+# depression_longitudinal/
+# pilot_connectivity/
+```
+
+## Heuristic Files
+
+The heuristic file (`heuristic_<study_name>.py`) defines how your sequences should be converted to BIDS format. While `bh04_make_heuristic.sh` creates an initial version automatically, you may need to adjust it for:
+
+- Complex sequence naming patterns
+- Multiple phase encoding directions (PA/AP)
+- Multi-echo sequences
+- Custom acquisition parameters
+
+Sample heuristic files are provided in the `code/` directory as templates.
+
+## Troubleshooting
+
+### Common Issues
+
+1. **No sequences detected**: Check your DICOM directory structure in `DICOM/sorted/`
+2. **Heuristic doesn't match**: Review and edit `code/heuristic_<study_name>.py`
+3. **Subject list empty**: Verify your directory naming pattern
+4. **Conversion errors**: Check heudiconv logs and DICOM file integrity
+
+### Getting Help
+
+- Check the generated log files in your study directory
+- Review the BIDS validator output
+- Examine the heuristic file matching rules
+- Use the BIDS community forum for BIDS-specific questions
+
+## Example Complete Workflow
+
+```bash
+# 1. Create study workspace
+bh01_prep_dir.sh my_rsfmri_study
+
+# 2. Copy DICOM files to my_rsfmri_study/DICOM/original/
+
+# 3. Sort DICOM files
+bh02_sort_dicom.sh my_rsfmri_study
+
+# 4. Create subject list
+bh03_make_subjlist.sh my_rsfmri_study "{subject}_{session}"
+
+# 5. Generate heuristic (review and edit if needed)
+bh04_make_heuristic.sh my_rsfmri_study
+
+# 6. Convert to BIDS
+bh05_make_bids.sh my_rsfmri_study
+
+# 7. Validate your BIDS dataset
+# Upload my_rsfmri_study/bids/rawdata/ to BIDS validator
+```
 
 ---
 
@@ -124,7 +244,15 @@ The heuristic file (`heuristic_setname.py`) defines how your sequences should be
 
 ## batch-heudiconv とは
 
-DICOMファイルをBIDS形式に変換するためのスクリプト群です。heudiconvを使用して、効率的にデータを変換します。
+DICOMファイルをBIDS形式に変換するためのスクリプト群です。各研究を独立したワークスペースで管理し、効率的にデータを変換します。
+
+## 主な特徴
+
+✅ **研究単位での管理**: 各研究が独自のワークスペースを持つ  
+✅ **自動heuristic生成**: 研究固有の変換ルールを作成  
+✅ **段階的ワークフロー**: DICOMからBIDSへの明確な進行  
+✅ **マルチベンダー対応**: Siemens、GE、Philipsスキャナに対応  
+✅ **バックアップ機能**: プロセス全体で元データを保護  
 
 ## 必要なソフトウェア
 
@@ -132,89 +260,55 @@ DICOMファイルをBIDS形式に変換するためのスクリプト群です�
 - **pydicom**: `pip install pydicom`もしくは`conda install pydicom`でインストール
 - **heudiconv**: `pip install heudiconv`でインストール
 
-## インストール方法
+## 使用方法の流れ
 
-1. リポジトリのクローン:
-```bash
-git clone https://github.com/kytk/batch-heudiconv.git
-cd batch-heudiconv
-```
+変換は5つのステップで構成され、各研究は独立して処理されます。
 
-2. PATHの設定:
-```bash
-./bh00_addpath.sh
-```
-
-3. 設定を反映させるため、ターミナルを再起動してください。
-
-## 使用方法
-
-変換は5つの主要なステップで構成されています：
-
-### 1. ディレクトリ構造の準備
+### 1. 🏗️ 研究ワークスペースの準備
 
 ```bash
-bh01_prep_dir.sh <setname>
+bh01_prep_dir.sh <研究名>
 ```
 
-以下のディレクトリが作成されます：
-- `DICOM/original/`: 元のDICOMファイルを配置
-- `DICOM/sorted/`: ソートされたDICOMファイル用
-- `DICOM/converted/`: 処理済みファイルのバックアップ
-- `bids/`: BIDS形式の出力
-- `code/`: heuristicファイル用
-- `tmp/`: 一時ファイル用
+**例:**
+```bash
+bh01_prep_dir.sh resting_state_2024     # 安静時fMRI研究
+bh01_prep_dir.sh pilot_dwi_study        # 拡散強調画像研究
+```
 
-### 2. DICOMファイルのソート
-
-DICOMファイルを`DICOM/original/`に配置した後、以下を実行：
+### 2. 🗂️ DICOMファイルの整理
 
 ```bash
-bh02_sort_dicom.sh <setname>
+bh02_sort_dicom.sh <研究名>
 ```
 
-### 3. 被験者リストの作成
-
-ディレクトリ命名パターンに基づいて被験者リストを生成：
+### 3. 📋 被験者リストの作成
 
 ```bash
-bh03_make_subjlist.sh <setname> "<pattern>"
+bh03_make_subjlist.sh <研究名> "<パターン>"
 ```
 
-パターン例：
-- `{subject}_{session}`: "sub-001_01"形式
-- `{subject}-{session}`: "sub-001-01"形式
-- `{subject}`: "sub-001"形式
-
-### 4. Heuristicファイルの生成 (α版)
-
-DICOMデータの構造に基づいてheuristicファイルを作成：
+### 4. ⚙️ 研究固有のHeuristicファイル生成
 
 ```bash
-bh04_make_heuristic.sh <setname>
+bh04_make_heuristic.sh <研究名>
 ```
 
-このスクリプトはDICOMファイルを分析し、カスタマイズされたheuristicファイル（`code/heuristic_<setname>.py`）を作成します。必要に応じて内容を確認・調整してください。まだこのスクリプトは改良が必要な状況です。
-
-### 5. BIDS形式への変換
-
-#### 標準的な変換
-通常のデータセット用：
+### 5. 🎯 BIDS形式への変換
 
 ```bash
-bh05_make_bids.sh <setname>
+bh05_make_bids.sh <研究名>
 ```
 
-#### Double-Echo Fieldmapデータの変換
-Double-echo fieldmapを含むデータセット用：
+## 複数研究の並行管理
 
 ```bash
-bh05_make_bids_double_echo_fieldmap.sh <setname> [fieldmap_threshold]
+# 異なる研究を同時に設定可能
+bh01_prep_dir.sh 自閉症_安静時fMRI_2024
+bh01_prep_dir.sh うつ病_縦断研究
+bh01_prep_dir.sh パイロット_接続性解析
+
+# 各研究は独自のワークスペースと設定を持つ
 ```
 
-`fieldmap_threshold`はオプションで、デフォルトは78です。
-
-## Heuristicファイル
-
-heuristicファイル（`heuristic_setname.py`）は、各シーケンスをどのようにBIDS形式に変換するかを定義します。`04_make_heuristic.sh`で自動生成された初期バージョンを、必要に応じて調整してください。サンプルファイルが`code`ディレクトリに用意されています。
-
+各研究のheuristicファイル（`heuristic_<研究名>.py`）は、必要に応じて調整してください。サンプルファイルが`code/`ディレクトリに用意されています。

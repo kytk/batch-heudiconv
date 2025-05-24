@@ -37,7 +37,7 @@ bh01_prep_dir.sh MR001
 bh02_sort_dicom.sh MR001
 
 # Create subject list
-bh03_make_subjlist.sh MR001 "{subject}_{session}"
+bh03_make_subjlist.sh MR001 {subject}
 
 # Generate and customize heuristic file
 bh04_make_heuristic.sh MR001
@@ -67,7 +67,8 @@ docker run --rm -v $(pwd):/data kytk/batch-heudiconv:latest bh02_sort_dicom.sh M
 docker run --rm -v $(pwd):/data kytk/batch-heudiconv:latest bash -c "
   bh01_prep_dir.sh MR001 && \
   bh02_sort_dicom.sh MR001 && \
-  bh03_make_subjlist.sh MR001 '{subject}_{session}'
+  bh03_make_subjlist.sh MR001 {subject} && \
+  bh05_05_make_bids.sh MR01
 "
 ```
 
@@ -258,7 +259,7 @@ bh01_prep_dir.sh MR001
 bh02_sort_dicom.sh MR001
 
 # 被験者リストの作成
-bh03_make_subjlist.sh MR001 "{subject}_{session}"
+bh03_make_subjlist.sh MR001 {subject}
 
 # heuristicファイルの生成とカスタマイズ
 bh04_make_heuristic.sh MR001
@@ -288,7 +289,8 @@ docker run --rm -v $(pwd):/data kytk/batch-heudiconv:latest bh02_sort_dicom.sh M
 docker run --rm -v $(pwd):/data kytk/batch-heudiconv:latest bash -c "
   bh01_prep_dir.sh MR001 && \
   bh02_sort_dicom.sh MR001 && \
-  bh03_make_subjlist.sh MR001 '{subject}_{session}'
+  bh03_make_subjlist.sh MR001 {subject} && \
+  bh05_make_bids.sh MR001
 "
 ```
 

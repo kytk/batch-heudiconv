@@ -1,24 +1,25 @@
 #!/bin/bash
-# script to create heuristic.py for BIDS conversion of neuroimaging data
-# Designed to handle both standard Siemens/GE sequences and 
-# multiband acquisitions
-# K.Nemoto 06 May 2025
+# Script to create heuristic.py for BIDS conversion
+# Run this script after bh03_make_subjlist.sh
+# K.Nemoto 24 May 2025
 
 # For debugging
 #set -x
 
 usage() {
-    echo "Create neuroimaging-specific heuristic.py by analyzing DICOM directory structure"
-    echo "Usage: $0 <setname> [scanner_type]"
-    echo
-    echo "Parameters:"
-    echo "  setname      : Name of the sequence set"
-    echo "  scanner_type : Optional - specify 'siemens' or 'ge' (default: auto-detect)"
-    echo
+    echo "Create heuristic file by analyzing your study's DICOM structure"
+    echo "Usage: $0 <study_name>"
+    echo ""
     echo "This script will:"
-    echo "1. Analyze your neuroimaging DICOM directory structure"
-    echo "2. Identify sequence types (T1w, T2w, fMRI, DWI, fieldmaps)"
-    echo "3. Generate a customized heuristic.py file for BIDS conversion"
+    echo "1. Analyze your DICOM directory structure"
+    echo "2. Identify sequence types (T1w, fMRI, DWI, fieldmaps)"
+    echo "3. Generate code/heuristic_<study_name>.py"
+    echo ""
+    echo "Prerequisites:"
+    echo "  - DICOM files sorted with: bh02_sort_dicom.sh <study_name>"
+    echo "  - Subject list created with: bh03_make_subjlist.sh <study_name> '<pattern>'"
+    echo ""
+    echo "Output: <study_name>/code/heuristic_<study_name>.py"
     exit 1
 }
 
@@ -26,146 +27,135 @@ if [[ $# -lt 1 ]]; then
     usage
 fi
 
-setname=${1%/}
-scanner_type=${2:-"auto"}
+study_name=${1%/}
 
 # Check prerequisites
-if [[ ! -d $setname/DICOM/sorted ]]; then
-    echo "Error: Sorted DICOM directory not found"
-    echo "Please run bh02_sort_dicom.sh first"
+if [[ ! -d $study_name/DICOM/sorted ]]; then
+    echo "Error: Study '$study_name' - sorted DICOM directory not found"
+    echo "Please run: bh02_sort_dicom.sh $study_name"
     exit 1
 fi
 
-if [[ ! -f $setname/tmp/subjlist_${setname}.tsv ]]; then
-    echo "Error: Subject list not found"
-    echo "Please run bh03_make_subjlist.sh first"
+if [[ ! -f $study_name/tmp/subjlist_${study_name}.tsv ]]; then
+    echo "Error: Study '$study_name' - subject list not found"
+    echo "Please run: bh03_make_subjlist.sh $study_name '<pattern>'"
     exit 1
 fi
 
 # Create temporary files
-mkdir -p "$setname/tmp"
-mkdir -p "$setname/code"
-series_list="$setname/tmp/series_list.txt"
-template_file="$setname/code/heuristic_${setname}.py"
+mkdir -p "$study_name/tmp"
+mkdir -p "$study_name/code"
+series_list="$study_name/tmp/series_list.txt"
+template_file="$study_name/code/heuristic_${study_name}.py"
+
+# Function to detect sequence type based on directory name and DICOM header
+detect_sequence_type() {
+    local dirname=$1
+    local dim4=${2:-1}
+    
+    # Remove series number prefix (e.g., "01_" from "01_MPRAGE")
+    local series_desc=${dirname#[0-9]*_}
+    
+    # Convert to uppercase for case-insensitive matching
+    local desc_upper=$(echo "$series_desc" | tr '[:lower:]' '[:upper:]')
+    
+    case $desc_upper in
+        # T1w patterns - Siemens & GE
+        *"MPRAGE"*|*"T1W"*|*"T1"*|*"3D_T1"*|*"IR-FSPGR"*|*"BRAVO"*|*"SAG"*|*"SPGR"*)
+            echo "T1w"
+            ;;
+        
+        # T2w patterns - Siemens & GE
+        *"T2W"*|*"T2"*|*"T2_TSE"*|*"SPC_T2"*|*"FLAIR"*|*"CUBE"*|*"T2FLAIR"*)
+            echo "T2w"
+            ;;
+        
+        # Resting-state fMRI patterns
+        *"REST"*|*"RESTING"*|*"RESTING_STATE"*|*"RS_MB"*|*"RESTING_STATE_FMRI"*|*"FMRI_RESTING"*)
+            if [[ $dim4 -gt 100 ]]; then
+                echo "func_rest"
+            else
+                echo "unknown"
+            fi
+            ;;
+        
+        # DWI patterns
+        *"DWI"*|*"DTI"*|*"DIFF"*|*"EP2D_DIFF"*|*"DTI_30"*|*"TENSOR"*|*"DTI_MPG"*|*"DTIMPG"*)
+            if [[ $dim4 -gt 5 ]]; then
+                echo "dwi"
+            else
+                echo "unknown"
+            fi
+            ;;
+        
+        # Fieldmap patterns
+        *"FIELD"*|*"FIELD_MAP"*|*"FIELD_MAPPING"*|*"2D-FIELD_MAP"*)
+            if [[ $desc_upper == *"MAPPING"* ]]; then
+                echo "fieldmap_siemens"
+            else
+                echo "fieldmap_ge"
+            fi
+            ;;
+        
+        # Phase encoding patterns
+        *"_AP"*|*"_PA"*|*"_LR"*|*"_RL"*)
+            if [[ $desc_upper =~ (REST|RESTING|RS) ]]; then
+                echo "func_rest_dir"
+            elif [[ $desc_upper =~ (DWI|DTI|DIFF) ]]; then
+                echo "dwi_dir"
+            else
+                echo "unknown"
+            fi
+            ;;
+        
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
+echo "Analyzing DICOM structure for study: $study_name"
+echo ""
 
 # Clear and create series list
 > "$series_list"
 
-echo "Scanning directory structure in $setname/DICOM/sorted..."
-
-# Extract sequence patterns from directory names
-seq_dirs=$(find "$setname/DICOM/sorted" -mindepth 2 -maxdepth 2 -type d)
-
-# Auto-detect scanner type if not specified
-if [[ "$scanner_type" == "auto" ]]; then
-    if grep -q "GRE-EPI" <<< "$seq_dirs" || grep -q "SPGR" <<< "$seq_dirs"; then
-        scanner_type="ge"
-        echo "Auto-detected GE scanner"
-    else
-        scanner_type="siemens"
-        echo "Auto-detected Siemens scanner (default)"
-    fi
-fi
-
-# Process sequence directories to identify patterns
-echo "Analyzing sequence directories..."
-
-# Function to extract sequence details
-analyze_sequence_dir() {
-    local dir_path="$1"
-    local dirname=$(basename "$dir_path")
-    
-    # Extract sequence name, removing any numbering suffixes
-    local series_desc=$(echo "$dirname" | sed -E 's/_[0-9]+$|^[0-9]+_//')
-    
-    # Skip scout, localizer, and derived images
-    if [[ "$series_desc" =~ (Scout|scout|Localizer|localizer|MPR_|setup|TRACEW|FA$|ColFA) ]]; then
-        echo "$dirname|SKIP|0" >> "$series_list"
-        return
-    fi
-    
-    # Set defaults
-    local seq_type="unknown"
-    local direction="none"
-    local is_sbref="no"
-    local dim4=1
-    
-    # Extract phase encoding direction (AP/PA) if present
-    if [[ "$series_desc" =~ _AP ]]; then
-        direction="AP"
-    elif [[ "$series_desc" =~ _PA ]]; then
-        direction="PA"
-    fi
-    
-    # Detect single-band reference images if present
-    if [[ "$series_desc" =~ SBRef ]]; then
-        is_sbref="yes"
-    fi
-    
-    # Categorize by sequence type
-    if [[ "$series_desc" =~ (^|_)T1(_|$) || "$series_desc" =~ T1_MPR || "$series_desc" =~ MPRAGE ]]; then
-        seq_type="T1w"
-    elif [[ "$series_desc" =~ (^|_)T2(_|$) || "$series_desc" =~ T2_SPC ]]; then
-        seq_type="T2w"
-    elif [[ "$series_desc" =~ BOLD || "$series_desc" =~ REST || "$series_desc" =~ Resting_State ]]; then
-        seq_type="func_rest"
-        dim4=200  # Typical length for resting state
-    elif [[ "$series_desc" =~ DWI || "$series_desc" =~ DTI || "$series_desc" =~ diff_30dir ]]; then
-        seq_type="dwi"
-        dim4=30  # Typical DWI volume count
-    elif [[ "$series_desc" =~ SEField || "$series_desc" =~ field_map || "$series_desc" =~ Field_mapping ]]; then
-        # Check if using standard fieldmap or spin-echo fieldmap format
-        if [[ "$series_desc" =~ SEField ]]; then
-            seq_type="fieldmap_spinecho"
-        else
-            seq_type="fieldmap_standard"
+# Process each directory and create series list
+while IFS= read -r dir; do
+    series_name=$(basename "$dir")
+    # Get dim4 from example DICOM if possible
+    dim4=1
+    if command -v dcmdump >/dev/null 2>&1; then
+        example_dcm=$(find "$dir" -type f -name "*.dcm" -o -name "*.IMA" | head -n 1)
+        if [[ -n "$example_dcm" ]]; then
+            dim4=$(dcmdump "$example_dcm" 2>/dev/null | grep NumberOfTemporalPositions || echo "1")
         fi
     fi
-    
-    # Output formatted entry
-    echo "$dirname|$seq_type|$direction|$is_sbref|$dim4" >> "$series_list"
-    echo "  Analyzed: $dirname -> Type: $seq_type, Direction: $direction, SBRef: $is_sbref"
-}
+    sequence_type=$(detect_sequence_type "$series_name" "$dim4")
+    echo "$series_name|$sequence_type|$dim4" >> "$series_list"
+done < <(find "$study_name/DICOM/sorted" -mindepth 2 -maxdepth 2 -type d)
 
-# Process each directory
-for dir in $seq_dirs; do
-    analyze_sequence_dir "$dir"
-done
-
-# Determine if session is used
-use_session=false
-if grep -q "{session}" "$setname/tmp/subjlist_${setname}.tsv"; then
-    use_session=true
-    echo "Detected session structure in subject list"
+# Check if series list was created successfully
+if [[ ! -s "$series_list" ]]; then
+    echo "Error: No series found in DICOM/sorted/"
+    exit 1
 fi
 
-# Check if we have multiband EPI or standard acquisitions
-has_multiband=false
-if grep -q "func_rest|AP\|PA" "$series_list" || grep -q "dwi|AP\|PA" "$series_list"; then
-    has_multiband=true
-    echo "Detected multiband acquisition with phase encoding directions"
-fi
+echo "Found sequences in study '$study_name':"
+echo "----------------------------------------"
+while IFS='|' read -r series_name seq_type dim4; do
+    printf "%-30s -> %-15s (volumes: %s)\n" "$series_name" "$seq_type" "$dim4"
+done < "$series_list"
+echo ""
 
-# Check if we have standard fieldmaps or spin-echo fieldmaps
-has_standard_fieldmap=false
-has_spinecho_fieldmap=false
-if grep -q "fieldmap_standard" "$series_list"; then
-    has_standard_fieldmap=true
-    echo "Detected standard fieldmap acquisition (magnitude/phase)"
-fi
-if grep -q "fieldmap_spinecho" "$series_list"; then
-    has_spinecho_fieldmap=true
-    echo "Detected spin-echo fieldmap acquisition (EPI-based)"
-fi
+# Generate heuristic.py
+echo "Generating heuristic file: code/heuristic_${study_name}.py"
 
-# Generate the heuristic file
-echo "Generating heuristic.py file..."
-
-# Create header
+# Generate header and fixed parts
 cat > "$template_file" << EOF
-# heuristic.py for ${setname}
-# Generated by enhanced bh04_make_heuristic.sh
-# $(date +%Y-%m-%d)
+# heuristic.py for study: ${study_name}
+# Generated by bh04_make_heuristic.sh on $(date +%Y-%m-%d)
+# Please review and modify as needed for your specific study
 
 import os
 
@@ -177,332 +167,158 @@ def create_key(template, outtype=('nii.gz',), annotation_classes=None):
 def infotodict(seqinfo):
     """Heuristic evaluator for determining which runs belong where
     
+    This function maps DICOM series to BIDS file naming conventions
+    for study: ${study_name}
+
     allowed template fields - follow python string module:
-    
+
     item: index within category
     subject: participant id
     seqitem: run number during scanning
     subindex: sub index within group
     """
 
-    ##### list keys for t1w, t2w, dwi, rs-fMRI, and filedmaps below ############
+    ##### BIDS templates for study: ${study_name} ############
 EOF
 
-# Create key templates based on session usage and acquisition type
-if $use_session; then
-    # With session
-    if $has_multiband; then
-        # Multiband with directions
-        cat >> "$template_file" << EOF
-    # T1
+# Add key definitions based on whether session is used
+if grep -q "{session}" "$study_name/tmp/subjlist_${study_name}.tsv"; then
+    cat >> "$template_file" << 'KEYS_WITH_SESSION'
+    
+    # Anatomical scans
     t1w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T1w')
-
-    # T2
-    t2w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T2w')
-
-    # Resting-state (PA and AP)
-    func_rest_PA = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-PA_task-rest_run-{item:02d}_bold')
-    func_rest_PA_sbref = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-PA_task-rest_run-{item:02d}_sbref')
-    func_rest_AP = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-AP_task-rest_run-{item:02d}_bold')
-    func_rest_AP_sbref = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-AP_task-rest_run-{item:02d}_sbref')
-
-    # DWI (PA and AP)
-    dwi_PA = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_dwi')
-    dwi_PA_sbref = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_sbref')
-    dwi_AP = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_dwi')
-    dwi_AP_sbref = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_sbref')
-EOF
-    else
-        # Standard acquisition
-        cat >> "$template_file" << EOF
-    # T1
-    t1w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T1w')
-
-    # T2
     #t2w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T2w')
 
-    # Resting-state (only one phase encoding)
+    # Functional scans
     func_rest = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_task-rest_run-{item:02d}_bold')
+    #func_rest_PA = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-PA_task-rest_run-{item:02d}_bold')
+    #func_rest_AP = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_dir-AP_task-rest_run-{item:02d}_bold')
 
-    # DWI (only one phase encoding)
+    # Diffusion scans
     dwi = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:02d}_dwi')
-EOF
-    fi
-else
-    # Without session
-    if $has_multiband; then
-        # Multiband with directions
-        cat >> "$template_file" << EOF
-    # T1
-    t1w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T1w')
+    #dwi_PA = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-PA_run-{item:02d}_dwi')
+    #dwi_AP = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_dir-AP_run-{item:02d}_dwi')
 
-    # T2
-    t2w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T2w')
-
-    # Resting-state (PA and AP)
-    func_rest_PA = create_key('sub-{subject}/func/sub-{subject}_dir-PA_task-rest_run-{item:02d}_bold')
-    func_rest_PA_sbref = create_key('sub-{subject}/func/sub-{subject}_dir-PA_task-rest_run-{item:02d}_sbref')
-    func_rest_AP = create_key('sub-{subject}/func/sub-{subject}_dir-AP_task-rest_run-{item:02d}_bold')
-    func_rest_AP_sbref = create_key('sub-{subject}/func/sub-{subject}_dir-AP_task-rest_run-{item:02d}_sbref')
-
-    # DWI (PA and AP)
-    dwi_PA = create_key('sub-{subject}/dwi/sub-{subject}_dir-PA_run-{item:02d}_dwi')
-    dwi_PA_sbref = create_key('sub-{subject}/dwi/sub-{subject}_dir-PA_run-{item:02d}_sbref')
-    dwi_AP = create_key('sub-{subject}/dwi/sub-{subject}_dir-AP_run-{item:02d}_dwi')
-    dwi_AP_sbref = create_key('sub-{subject}/dwi/sub-{subject}_dir-AP_run-{item:02d}_sbref')
-EOF
-    else
-        # Standard acquisition
-        cat >> "$template_file" << EOF
-    # T1
-    t1w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T1w')
-
-    # T2
-    #t2w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T2w')
-
-    # Resting-state (only one phase encoding)
-    func_rest = create_key('sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_bold')
-
-    # DWI (only one phase encoding)
-    dwi = create_key('sub-{subject}/dwi/sub-{subject}_run-{item:02d}_dwi')
-EOF
-    fi
-fi
-
-# Add fieldmap keys based on detected types
-if $has_standard_fieldmap; then
-    if $use_session; then
-        cat >> "$template_file" << EOF
-    # Fieldmap (magnitude and phasediff: Siemens)
+    # Fieldmaps
     fmap_mag = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_magnitude')
     fmap_phase = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_phasediff')
-EOF
-    else
-        cat >> "$template_file" << EOF
-    # Fieldmap (magnitude and phasediff: Siemens)
+    #fmap_PA = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-PA_fieldmap')
+    #fmap_AP = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_dir-AP_fieldmap')
+KEYS_WITH_SESSION
+else
+    cat >> "$template_file" << 'KEYS_WITHOUT_SESSION'
+    
+    # Anatomical scans
+    t1w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T1w')
+    #t2w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T2w')
+
+    # Functional scans
+    func_rest = create_key('sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_bold')
+    #func_rest_PA = create_key('sub-{subject}/func/sub-{subject}_dir-PA_task-rest_run-{item:02d}_bold')
+    #func_rest_AP = create_key('sub-{subject}/func/sub-{subject}_dir-AP_task-rest_run-{item:02d}_bold')
+
+    # Diffusion scans
+    dwi = create_key('sub-{subject}/dwi/sub-{subject}_run-{item:02d}_dwi')
+    #dwi_PA = create_key('sub-{subject}/dwi/sub-{subject}_dir-PA_run-{item:02d}_dwi')
+    #dwi_AP = create_key('sub-{subject}/dwi/sub-{subject}_dir-AP_run-{item:02d}_dwi')
+
+    # Fieldmaps
     fmap_mag = create_key('sub-{subject}/fmap/sub-{subject}_magnitude')
     fmap_phase = create_key('sub-{subject}/fmap/sub-{subject}_phasediff')
-EOF
-    fi
+KEYS_WITHOUT_SESSION
 fi
 
-if $has_spinecho_fieldmap; then
-    if $use_session; then
-        cat >> "$template_file" << EOF
-    # Field map (two phases: Siemens)
-    fmap_PA = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_acq-func_dir-PA_run-{item:02d}_epi')
-    fmap_AP = create_key('sub-{subject}/{session}/fmap/sub-{subject}_{session}_acq-func_dir-AP_run-{item:02d}_epi')
-EOF
-    else
-        cat >> "$template_file" << EOF
-    # Field map (two phases: Siemens)
-    fmap_PA = create_key('sub-{subject}/fmap/sub-{subject}_acq-func_dir-PA_run-{item:02d}_epi')
-    fmap_AP = create_key('sub-{subject}/fmap/sub-{subject}_acq-func_dir-AP_run-{item:02d}_epi')
-EOF
-    fi
-fi
+# Add info dictionary initialization and seqinfo documentation
+cat >> "$template_file" << 'COMMON'
 
-# Initialize info dictionary based on detected sequence types
-cat >> "$template_file" << EOF
+    # Initialize dictionary to collect series
+    info = {t1w: [], func_rest: [], dwi: [], fmap_mag: [], fmap_phase: []}
 
-EOF
-
-echo -n "    info = {" >> "$template_file"
-if $has_multiband; then
-    echo -n "t1w: [], t2w: [], func_rest_PA: [], func_rest_PA_sbref: [], func_rest_AP: [], func_rest_AP_sbref: [], dwi_PA: [], dwi_PA_sbref: [], dwi_AP: [], dwi_AP_sbref: []" >> "$template_file"
-else
-    echo -n "t1w: [], func_rest: [], dwi: []" >> "$template_file"
-fi
-
-if $has_standard_fieldmap; then
-    echo -n ", fmap_mag: [], fmap_phase: []" >> "$template_file"
-fi
-
-if $has_spinecho_fieldmap; then
-    echo -n ", fmap_PA: [], fmap_AP: []" >> "$template_file"
-fi
-
-echo "}" >> "$template_file"
-
-# Add seqinfo documentation
-cat >> "$template_file" << EOF
-
+    ############################################################################
+    # Series identification rules for this study
     ############################################################################
 
     for idx, s in enumerate(seqinfo):
         """
         The namedtuple `s` contains the following fields:
-
-        * total_files_till_now
-        * example_dcm_file
-        * series_id
-        * dcm_dir_name
-        * unspecified2
-        * unspecified3
-        * dim1
-        * dim2
-        * dim3
-        * dim4
-        * TR
-        * TE
-        * protocol_name
-        * is_motion_corrected
-        * is_derived
-        * patient_id
-        * study_description
-        * referring_physician_name
-        * series_description
-        * image_type
+        * total_files_till_now, example_dcm_file, series_id, dcm_dir_name
+        * dim1, dim2, dim3, dim4, TR, TE, protocol_name
+        * is_motion_corrected, is_derived, patient_id, study_description
+        * referring_physician_name, series_description, image_type
         """
 
-        ### extract keywords from sorted DICOM series-based sub-directories and dimensions ###
+COMMON
 
-EOF
+# Add sequence matching rules
+echo "        # Sequence matching rules based on your study's DICOM structure" >> "$template_file"
+echo "" >> "$template_file"
 
-# Generate sequence matching rules based on analyzed directories
-if ! $has_multiband; then
-    # Standard acquisition style rules
-    
-    # T1w rules
-    grep "|T1w|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        # Extract only the part after the number (e.g., from "MPRAGE_GRAPPA2_8" to "MPRAGE_GRAPPA2")
-        pattern=$(echo "$dirname" | sed -E 's/_[0-9]+$//')
-        echo "        # T1w" >> "$template_file"
-        echo "        if '$pattern' in s.dcm_dir_name:" >> "$template_file"
-        echo "            info[t1w].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    done
+while IFS='|' read -r dirname seqtype dim4; do
+    series_desc=${dirname#[0-9]*_}  # Remove series number
+    case $seqtype in
+        "T1w")
+            echo "        # T1-weighted: $dirname" >> "$template_file"
+            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+            echo "            info[t1w].append(s.series_id)" >> "$template_file"
+            echo >> "$template_file"
+            ;;
+        "func_rest")
+            echo "        # Resting-state fMRI: $dirname" >> "$template_file"
+            echo "        if '${series_desc}' in s.dcm_dir_name and s.dim4 >= 100:" >> "$template_file"
+            echo "            info[func_rest].append(s.series_id)" >> "$template_file"
+            echo >> "$template_file"
+            ;;
+        "dwi")
+            echo "        # Diffusion-weighted: $dirname" >> "$template_file"
+            echo "        if '${series_desc}' in s.dcm_dir_name and s.dim4 > 5:" >> "$template_file"
+            echo "            info[dwi].append(s.series_id)" >> "$template_file"
+            echo >> "$template_file"
+            ;;
+        "fieldmap_siemens")
+            echo "        # Fieldmap (Siemens): $dirname" >> "$template_file"
+            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+            echo "            if 'M' in s.image_type:" >> "$template_file"
+            echo "                info[fmap_mag].append(s.series_id)" >> "$template_file"
+            echo "            if 'P' in s.image_type:" >> "$template_file"
+            echo "                info[fmap_phase].append(s.series_id)" >> "$template_file"
+            echo >> "$template_file"
+            ;;
+        "fieldmap_ge")
+            echo "        # Fieldmap (GE): $dirname" >> "$template_file"
+            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+            echo "            # GE fieldmaps need special handling - review and adjust" >> "$template_file"
+            echo "            info[fmap_mag].append(s.series_id)" >> "$template_file"
+            echo >> "$template_file"
+            ;;
+    esac
+done < "$series_list"
 
-    # Func rules
-    grep "|func_rest|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        pattern=$(echo "$dirname" | sed -E 's/_[0-9]+$//')
-        echo "        # rs-fMRI" >> "$template_file"
-        echo "        if '$pattern' in s.dcm_dir_name:" >> "$template_file"
-        echo "            info[func_rest].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    done
-
-    # Dwi rules
-    grep "|dwi|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        pattern=$(echo "$dirname" | sed -E 's/_[0-9]+$//')
-        echo "        # DWI" >> "$template_file"
-        echo "        if '$pattern' in s.dcm_dir_name:" >> "$template_file"
-        echo "            info[dwi].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    done
-
-    # Fieldmap rules for standard acquisition
-    if $has_standard_fieldmap; then
-        # First field mapping directory
-        fieldmap_dir=$(grep "|fieldmap_standard|" "$series_list" | head -n 1 | cut -d'|' -f1)
-        pattern=$(echo "$fieldmap_dir" | sed -E 's/_[0-9]+$//')
-        
-        echo "        # Fieldmap (magnitude and phasediff: Siemens)" >> "$template_file"
-        echo "        if '$pattern' in s.dcm_dir_name and 'M' in s.image_type:" >> "$template_file"
-        echo "            info[fmap_mag].append(s.series_id)" >> "$template_file"
-        echo "        if '$pattern' in s.dcm_dir_name and 'P' in s.image_type:" >> "$template_file"
-        echo "            info[fmap_phase].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    fi
-else
-    # Multiband acquisition style rules
-    
-    # T1w rules
-    grep "|T1w|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        echo "        # T1w" >> "$template_file"
-        echo "        if '${dirname#*_}' in s.dcm_dir_name:" >> "$template_file"
-        echo "            info[t1w].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    done
-
-    # T2w rules
-    grep "|T2w|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        echo "        # T2w" >> "$template_file"
-        echo "        if '${dirname#*_}' in s.dcm_dir_name:" >> "$template_file"
-        echo "            info[t2w].append(s.series_id)" >> "$template_file"
-        echo >> "$template_file"
-    done
-
-    # Functional scans with direction
-    echo "        # Functional scans - PA direction" >> "$template_file"
-    grep "|func_rest|PA|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        if [[ "$is_sbref" == "yes" ]]; then
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[func_rest_PA_sbref].append(s.series_id)" >> "$template_file"
-        else
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and (s.dim4 >= 100):" >> "$template_file"
-            echo "            info[func_rest_PA].append(s.series_id)" >> "$template_file"
-        fi
-    done
-
-    echo >> "$template_file"
-    echo "        # Functional scans - AP direction" >> "$template_file"
-    grep "|func_rest|AP|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        if [[ "$is_sbref" == "yes" ]]; then
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[func_rest_AP_sbref].append(s.series_id)" >> "$template_file"
-        else
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and (s.dim4 >= 100):" >> "$template_file"
-            echo "            info[func_rest_AP].append(s.series_id)" >> "$template_file"
-        fi
-    done
-
-    # Diffusion scans with direction
-    echo >> "$template_file"
-    echo "        # Diffusion scans - PA direction" >> "$template_file"
-    grep "|dwi|PA|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        if [[ "$is_sbref" == "yes" ]]; then
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[dwi_PA_sbref].append(s.series_id)" >> "$template_file"
-        else
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name) and (s.dim4 >= 5):" >> "$template_file"
-            echo "            info[dwi_PA].append(s.series_id)" >> "$template_file"
-        fi
-    done
-
-    echo >> "$template_file"
-    echo "        # Diffusion scans - AP direction" >> "$template_file"
-    grep "|dwi|AP|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-        if [[ "$is_sbref" == "yes" ]]; then
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and ('SBRef' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[dwi_AP_sbref].append(s.series_id)" >> "$template_file"
-        else
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name) and (s.dim4 >= 5):" >> "$template_file"
-            echo "            info[dwi_AP].append(s.series_id)" >> "$template_file"
-        fi
-    done
-
-    # Spin-echo fieldmaps
-    if $has_spinecho_fieldmap; then
-        echo >> "$template_file"
-        echo "        # Field maps" >> "$template_file"
-        grep "|fieldmap_spinecho|PA|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('PA' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[fmap_PA].append(s.series_id)" >> "$template_file"
-        done
-        
-        grep "|fieldmap_spinecho|AP|" "$series_list" | while IFS='|' read -r dirname seq_type direction is_sbref dim4; do
-            echo "        if ('${dirname#*_}' in s.dcm_dir_name) and ('AP' in s.dcm_dir_name):" >> "$template_file"
-            echo "            info[fmap_AP].append(s.series_id)" >> "$template_file"
-        done
-    fi
-fi
-
-# Add return statement
+# Add return statement and IntendedFor
 cat >> "$template_file" << EOF
-            
+
     return info
+
+# Automatic IntendedFor field population
+POPULATE_INTENDED_FOR_OPTS = {
+    'matching_parameters': ['ImagingVolume', 'Shims'],
+    'criterion': 'Closest'
+}
 EOF
 
-echo "Heuristic file created: $template_file"
-echo
-echo "Please review and edit the file if necessary."
-echo "The generated file contains:"
-echo "1. Anatomical scan definitions"
-echo "2. Functional scans"
-echo "3. Diffusion weighted imaging"
-echo "4. Fieldmaps"
-echo "5. Appropriate handling of phase encoding directions if detected"
+echo ""
+echo "Heuristic file created successfully!"
+echo ""
+echo "File: $study_name/code/heuristic_${study_name}.py"
+echo ""
+echo "Next steps:"
+echo "1. Review the generated heuristic file"
+echo "2. Modify sequence matching rules if needed"
+echo "3. Run BIDS conversion: bh05_make_bids.sh $study_name"
+echo ""
+echo "Note: The heuristic file may need manual adjustments for:"
+echo "  - Complex sequence naming patterns"
+echo "  - Multiple phase encoding directions"
+echo "  - Multi-echo sequences"
 
 # Cleanup
 rm -f "$series_list"
