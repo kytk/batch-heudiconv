@@ -113,6 +113,14 @@ echo ""
 echo "Study: $study_name"
 echo "Subjects found: $(($(wc -l < "$subjlist_file") - 1))"
 echo ""
-echo "Next step: Create heuristic file with: bh04_make_heuristic.sh $study_name"
+
+# Check if heuristic file already exists and suggest appropriate next step
+heuristic_file="code/heuristic_${study_name}.py"
+if [[ -f $heuristic_file ]]; then
+    echo "Next step: Convert to BIDS with: bh05_make_bids.sh $study_name"
+    echo "Note: Heuristic file already exists at: $heuristic_file"
+else
+    echo "Next step: Create heuristic file with: bh04_make_heuristic.sh $study_name"
+fi
 
 exit 0
