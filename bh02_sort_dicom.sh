@@ -1,41 +1,56 @@
 #!/bin/bash
 # Script to sort DICOM files using bh_dcm_sort_dir.py
-# K.Nemoto 28 Dec 2024
+# K.Nemoto 24 May 2025
 
 # For debugging
 #set -x
 
 if [[ $# -lt 1 ]]; then
-    echo "Please specify a name of sequence sets"
-    echo "Usage: $0 <name of sequence set>"
+    echo "Sort DICOM files into series-based directories for BIDS conversion"
+    echo "Usage: $0 <study_name>"
+    echo ""
+    echo "Prerequisites:"
+    echo "  - Study directory created with: bh01_prep_dir.sh <study_name>"
+    echo "  - DICOM files placed in: <study_name>/DICOM/original/"
+    echo ""
+    echo "This script will:"
+    echo "  1. Organize DICOM files by series number and description"
+    echo "  2. Clean up filenames (replace spaces with underscores)"
+    echo "  3. Create sorted directory structure for heudiconv"
     exit 1
 fi
 
-# First argument is a name of sequence set
-setname=${1%/}
+# First argument is a name of study
+study_name=${1%/}
 
-# Specify the path of 00_addpath.sh
+# Specify the path of bh00_addpath.sh
 batchpath=$(dirname $(command -v bh00_addpath.sh))
 
-# Check if the directory exists
-if [[ ! -d $setname ]]; then
-    echo "Error: Directory $setname does not exist"
-    echo "Please run 01_prep_dir.sh first"
+# Check if the study directory exists
+if [[ ! -d $study_name ]]; then
+    echo "Error: Study directory '$study_name' does not exist"
+    echo "Please run: bh01_prep_dir.sh $study_name"
     exit 1
 fi
 
-cd $setname
+cd $study_name
 
 # Check if there are DICOM directories in original
 dicom_dirs=$(ls -d DICOM/original/*/ 2>/dev/null)
 if [[ -z "$dicom_dirs" ]]; then
     echo "Error: No directories found in DICOM/original/"
     echo "Please copy DICOM directories to DICOM/original/ first"
+    echo ""
+    echo "Expected structure:"
+    echo "  ${study_name}/DICOM/original/"
+    echo "  ├── subject_01/"
+    echo "  ├── subject_02/"
+    echo "  └── ..."
     exit 1
 fi
 
 # Replace spaces with underscores in directory and file names
-echo "Replacing spaces with underscores in directory and file names..."
+echo "Cleaning up filenames (replacing spaces with underscores)..."
 # Single find command to handle all files and directories with spaces
 find DICOM/original -name '* *' | \
 while read -r line; do
@@ -45,7 +60,7 @@ while read -r line; do
 done
 
 # Sort DICOM files
-echo "Sorting DICOM files..."
+echo "Sorting DICOM files by series..."
 cd DICOM/original
 ${batchpath}/bh_dcm_sort_dir.py *
 
@@ -60,10 +75,15 @@ for dir in sorted_tmp/*; do
 done
 rm -rf sorted_tmp 2>/dev/null
 
-echo "DICOM sorting completed:"
-echo "- Original files remain in: DICOM/original/"
-echo "- Sorted files are in: DICOM/sorted/"
-echo
-echo "You can now proceed with creating the subject list."
+echo ""
+echo "DICOM sorting completed successfully!"
+echo ""
+echo "Next steps:"
+echo "1. Create subject list: bh03_make_subjlist.sh $study_name '<pattern>'"
+echo "2. Review sorted structure in: ${study_name}/DICOM/sorted/"
+echo ""
+echo "File locations:"
+echo "  - Original files: DICOM/original/ (preserved)"
+echo "  - Sorted files:   DICOM/sorted/ (ready for conversion)"
 
 exit 0
