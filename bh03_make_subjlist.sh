@@ -79,9 +79,14 @@ extract_info() {
     fi
 }
 
-# Create header for subject list
+# Create subject list file with pattern information at the top
 subjlist_file="tmp/subjlist_${study_name}.tsv"
-echo -e "directory\tsubject_ID\tsession" > "$subjlist_file"
+
+# Write pattern as metadata comment and header
+cat > "$subjlist_file" << EOF
+# pattern: $pattern
+directory	subject_ID	session
+EOF
 
 # Process each directory
 for dir in DICOM/sorted/*; do
@@ -92,7 +97,7 @@ for dir in DICOM/sorted/*; do
 done
 
 # Check if any subjects were found
-if [[ $(wc -l < "$subjlist_file") -le 1 ]]; then
+if [[ $(grep -v '^#' "$subjlist_file" | wc -l) -le 1 ]]; then
     echo "Error: No matching directories found with pattern: $pattern"
     echo ""
     echo "Available directories in DICOM/sorted/:"
@@ -111,7 +116,8 @@ echo "Content preview:"
 cat "$subjlist_file"
 echo ""
 echo "Study: $study_name"
-echo "Subjects found: $(($(wc -l < "$subjlist_file") - 1))"
+echo "Pattern used: $pattern"
+echo "Subjects found: $(($(grep -v '^#' "$subjlist_file" | wc -l) - 1))"
 echo ""
 
 # Check if heuristic file already exists and suggest appropriate next step
