@@ -95,7 +95,7 @@ echo ""
 total_subjects=$(($(wc -l < "$subjlist") - 1))
 current_subject=0
 
-tail -n +2 "$subjlist" | while IFS=$'\t' read -r dirname subject session
+tail -n +2 "$subjlist" | while IFS=
 do
     current_subject=$((current_subject + 1))
     echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session"
@@ -106,7 +106,7 @@ do
     
     if [[ $ndirs -eq 2 ]] && [[ $nfiles -eq $fmapthr ]]; then
         echo "  ✓ Detected double-echo fieldmap for ${subject}_${session}"
-        heudiconv -d "DICOM/sorted/${dirname}/*/*" \
+        heudiconv -d DICOM/sorted/{subject}/*/* \
                   -o bids/rawdata \
                   -f "$heuristic" \
                   -s "$subject" \
@@ -146,10 +146,10 @@ fi
 
 # Move instead of copy to save space
 if [[ -d DICOM/sorted ]]; then
-    mv DICOM/sorted DICOM/converted/sorted_$(date +%Y%m%d_%H%M%S)
+    mv DICOM/sorted DICOM/converted/
 fi
 if [[ -d DICOM/original ]]; then
-    mv DICOM/original DICOM/converted/original_$(date +%Y%m%d_%H%M%S)
+    mv DICOM/original DICOM/converted/
 fi
 
 # Create empty directories for future use
@@ -171,7 +171,8 @@ echo "2. Review conversion logs for any warnings"
 echo "3. Check dataset_description.json and README files"
 echo ""
 echo "Optional post-processing:"
-echo "  - Fix IntendedFor fields: bh_fix_intendedfor.py $study_name"
-echo "  - Reorganize GE fieldmaps: bh_reorganize_fieldmaps.py $study_name"
+echo "  - Fix IntendedFor fields: bh06_fix_intendedfor.py $study_name"
+echo "  - Reorganize GE fieldmaps: bh06_reorganize_fieldmaps.py $study_name"
 
 exit 0
+

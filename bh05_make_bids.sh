@@ -83,12 +83,12 @@ do
     current_subject=$((current_subject + 1))
     echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session"
     
-    # Use the dicom_pattern directly from the first column of subjlist
-    dicom_pattern="DICOM/sorted/${dirpattern}/*/*"
+    # Create DICOM pattern with {subject} placeholder for heudiconv
+    dicom_pattern='DICOM/sorted/{subject}/*/*'
     
     # Run heudiconv
     echo "  Running heudiconv..."
-    heudiconv -d "$dicom_pattern" \
+    heudiconv -d $dicom_pattern \
               -o bids/rawdata \
               -f "$heuristic" \
               -s "$subject" \
@@ -102,7 +102,7 @@ do
         echo "  Warning: heudiconv reported an error for subject $subject session $session"
         echo "  Check the logs and heuristic file for issues"
     else
-        echo "  Successfully processed subject $subject"
+        echo "  ✓ Successfully processed subject $subject"
     fi
     echo ""
 done
@@ -120,10 +120,10 @@ fi
 
 # Move instead of copy to save space
 if [[ -d DICOM/sorted ]]; then
-    mv DICOM/sorted DICOM/converted/sorted_$(date +%Y%m%d_%H%M%S)
+    mv DICOM/sorted DICOM/converted/
 fi
 if [[ -d DICOM/original ]]; then
-    mv DICOM/original DICOM/converted/original_$(date +%Y%m%d_%H%M%S)
+    mv DICOM/original DICOM/converted/
 fi
 
 # Create empty directories for future use
@@ -145,7 +145,7 @@ echo "2. Review conversion logs for any warnings"
 echo "3. Check dataset_description.json and README files"
 echo ""
 echo "Optional post-processing:"
-echo "  - Fix IntendedFor fields: bh_fix_intendedfor.py $study_name"
-echo "  - Reorganize GE fieldmaps: bh_reorganize_fieldmaps.py $study_name"
+echo "  - Fix IntendedFor fields: bh06_fix_intendedfor.py $study_name"
+echo "  - Reorganize GE fieldmaps: bh06_reorganize_fieldmaps.py $study_name"
 
 exit 0
