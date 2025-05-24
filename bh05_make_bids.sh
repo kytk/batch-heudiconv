@@ -5,7 +5,7 @@
 # K.Nemoto 24 May 2025
 
 # For debugging
-#set -x
+set -x
 
 usage() {
     echo "Convert sorted DICOM files to BIDS format for your study"
@@ -65,30 +65,42 @@ if [[ ! -d DICOM/sorted ]]; then
     exit 1
 fi
 
+# Extract pattern from subject list file
+pattern=$(grep '^# pattern:' "$subjlist" | sed 's/^# pattern: //')
+if [[ -z "$pattern" ]]; then
+    echo "Warning: Pattern not found in subject list file"
+    echo "Using default pattern: {subject}"
+    pattern="{subject}"
+fi
+
+echo "Pattern detected from subject list: $pattern"
+
+# Note: heudiconv will automatically replace {subject} placeholder in the pattern
+
 # Clean up any previous heudiconv directory
 [[ -d bids/.heudiconv ]] && rm -rf bids/.heudiconv
 
 # Process subjects
 echo "Starting BIDS conversion for study: $study_name"
 echo "Using heuristic: $heuristic"
+echo "Using pattern: $pattern"
 echo ""
 
 # Count total subjects
-total_subjects=$(($(wc -l < "$subjlist") - 1))
+total_subjects=$(($(grep -v '^#' "$subjlist" | wc -l) - 1))
 current_subject=0
 
-# Process each subject
-tail -n +2 "$subjlist" | while IFS=$'\t' read -r dirpattern subject session
+# Process each subject (skip comment lines)
+grep -v '^#' "$subjlist" | tail -n +2 | while IFS=$'\t' read -r dirpattern subject session
 do
     current_subject=$((current_subject + 1))
-    echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session"
+    echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session (Directory: $dirpattern)"
     
-    # Create DICOM pattern with {subject} placeholder for heudiconv
-    dicom_pattern='DICOM/sorted/{subject}/*/*'
+    echo "  Using DICOM pattern: DICOM/sorted/${pattern}/*/*"
+    echo "  Running heudiconv..."
     
     # Run heudiconv
-    echo "  Running heudiconv..."
-    heudiconv -d $dicom_pattern \
+    heudiconv -d DICOM/sorted/${pattern}/*/* \
               -o bids/rawdata \
               -f "$heuristic" \
               -s "$subject" \
@@ -137,6 +149,7 @@ echo ""
 echo "Results:"
 echo "  - BIDS dataset: $study_name/bids/rawdata/"
 echo "  - Subjects processed: $total_subjects"
+echo "  - Pattern used: $pattern"
 echo "  - DICOM backup: $study_name/DICOM/converted/"
 echo ""
 echo "Next steps:"

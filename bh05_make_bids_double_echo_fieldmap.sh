@@ -82,6 +82,16 @@ EOF
     echo "Created $merge_config"
 fi
 
+# Extract pattern from subject list file
+pattern=$(grep '^# pattern:' "$subjlist" | sed 's/^# pattern: //')
+if [[ -z "$pattern" ]]; then
+    echo "Warning: Pattern not found in subject list file"
+    echo "Using default pattern: {subject}"
+    pattern="{subject}"
+fi
+
+echo "Pattern detected from subject list: $pattern"
+
 # Clean up any previous heudiconv directory
 [[ -d bids/.heudiconv ]] && rm -rf bids/.heudiconv
 
@@ -89,24 +99,30 @@ fi
 echo "Starting BIDS conversion with double-echo fieldmap handling for study: $study_name"
 echo "Using fieldmap threshold: $fmapthr files"
 echo "Using heuristic: $heuristic"
+echo "Using pattern: $pattern"
 echo ""
 
 # Count total subjects
-total_subjects=$(($(wc -l < "$subjlist") - 1))
+total_subjects=$(($(grep -v '^#' "$subjlist" | wc -l) - 1))
 current_subject=0
 
-tail -n +2 "$subjlist" | while IFS=
+# Process each subject (skip comment lines)
+grep -v '^#' "$subjlist" | tail -n +2 | while IFS=$'\t' read -r dirpattern subject session
 do
     current_subject=$((current_subject + 1))
-    echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session"
+    echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session (Directory: $dirpattern)"
     
     # Check for double-echo fieldmap conditions
-    ndirs=$(find "DICOM/sorted/${dirname}/"*[Ff]ield* -type d 2>/dev/null | wc -l)
-    nfiles=$(find "DICOM/sorted/${dirname}/"*[Ff]ield* -type f 2>/dev/null | wc -l)
+    ndirs=$(find "DICOM/sorted/${dirpattern}/"*[Ff]ield* -type d 2>/dev/null | wc -l)
+    nfiles=$(find "DICOM/sorted/${dirpattern}/"*[Ff]ield* -type f 2>/dev/null | wc -l)
     
     if [[ $ndirs -eq 2 ]] && [[ $nfiles -eq $fmapthr ]]; then
         echo "  ✓ Detected double-echo fieldmap for ${subject}_${session}"
-        heudiconv -d DICOM/sorted/{subject}/*/* \
+        echo "  Using DICOM pattern: DICOM/sorted/${pattern}/*/*"
+        echo "  Running heudiconv..."
+        
+        # Use pattern for heudiconv (no quotes to allow wildcard expansion)
+        heudiconv -d DICOM/sorted/${pattern}/*/* \
                   -o bids/rawdata \
                   -f "$heuristic" \
                   -s "$subject" \
@@ -163,6 +179,7 @@ echo ""
 echo "Results:"
 echo "  - BIDS dataset: $study_name/bids/rawdata/"
 echo "  - Subjects processed: $total_subjects"
+echo "  - Pattern used: $pattern"
 echo "  - DICOM backup: $study_name/DICOM/converted/"
 echo ""
 echo "Next steps:"
@@ -175,4 +192,3 @@ echo "  - Fix IntendedFor fields: bh_fix_intendedfor.py $study_name"
 echo "  - Reorganize GE fieldmaps: bh_reorganize_fieldmaps.py $study_name"
 
 exit 0
-
