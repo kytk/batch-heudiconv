@@ -1,8 +1,0 @@
-Subject list to be processed
-First item: directory containing subject_ID (and optionally session)
-Second item: subject_ID
-Third itm: session
-##########
-directory 	subject_ID 	
-{subject}	id0001	
-{subject}	id0002	
