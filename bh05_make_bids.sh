@@ -145,7 +145,7 @@ echo "2. Review conversion logs for any warnings"
 echo "3. Check dataset_description.json and README files"
 echo ""
 echo "Optional post-processing:"
-echo "  - Fix IntendedFor fields: bh06_fix_intendedfor.py $study_name"
-echo "  - Reorganize GE fieldmaps: bh06_reorganize_fieldmaps.py $study_name"
+echo "  - Fix IntendedFor fields: bh_fix_intendedfor.py $study_name"
+echo "  - Reorganize GE fieldmaps: bh_reorganize_fieldmaps.py $study_name"
 
 exit 0

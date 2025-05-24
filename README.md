@@ -156,19 +156,28 @@ study_name/
     └── subjlist_study_name.tsv     # Subject list for this study
 ```
 
-## Advanced Features
 
-### Post-processing Scripts
+---
 
-**Fix IntendedFor fields for fieldmaps:**
+### 🔧 **Utility Scripts (run as needed)**
+
+These scripts address specific post-processing needs and can be run independently:
+
+**Fix fieldmap references:**
 ```bash
-bh06_fix_intendedfor.py <study_name>
+bh_fix_intendedfor.py <study_name>
 ```
 
-**Reorganize GE fieldmap files:**
+**Reorganize GE fieldmaps:**
 ```bash
-bh06_reorganize_fieldmaps.py <study_name>
+bh_reorganize_fieldmaps.py <study_name> [--keep-extra]
 ```
+
+**Sort DICOM files directly:**
+```bash
+bh_dcm_sort_dir.py <dicom_directory>
+```
+
 
 ### Managing Multiple Studies
 
@@ -299,6 +308,29 @@ bh04_make_heuristic.sh <研究名>
 ```bash
 bh05_make_bids.sh <研究名>
 ```
+
+---
+
+### 🔧 **ユーティリティスクリプト（必要に応じて実行）**
+
+これらのスクリプトは特定の後処理に対応し、独立して実行できます：
+
+**fieldmap参照の修正:**
+```bash
+bh_fix_intendedfor.py <研究名>
+```
+
+**GE fieldmapの整理:**
+```bash
+bh_reorganize_fieldmaps.py <研究名> [--keep-extra]
+```
+
+**DICOMファイルの直接ソート:**
+```bash
+bh_dcm_sort_dir.py <DICOMディレクトリ>
+```
+
+
 
 ## 複数研究の並行管理
 

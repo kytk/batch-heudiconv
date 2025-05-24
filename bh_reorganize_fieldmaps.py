@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Reorganize GE fieldmap files after BIDS conversion
+# This script handles the complex file naming issues that occur with GE fieldmaps during heudiconv processing
+# K.Nemoto 24 May 2025
 
 import os
 import json
@@ -10,7 +13,7 @@ import pandas as pd
 import re
 
 def check_image_type(json_file):
-    """Check ImageType from JSON file"""
+    """Check ImageType from JSON file to determine if it's magnitude or phase"""
     try:
         with open(json_file, 'r') as f:
             data = json.load(f)
@@ -39,28 +42,36 @@ def update_scans_tsv(scans_file, rename_mapping, files_deleted):
             
             if old_path in df['filename'].values:
                 df.loc[df['filename'] == old_path, 'filename'] = new_path
-                print(f"Updated scans.tsv: {old_path} -> {new_path}")
+                print(f"  Updated scans.tsv: {old_path} -> {new_path}")
         
         # Remove entries for deleted files
         for deleted_file in files_deleted:
             deleted_path = f"fmap/{deleted_file}"
             if deleted_path in df['filename'].values:
                 df = df[df['filename'] != deleted_path]
-                print(f"Removed from scans.tsv: {deleted_path}")
+                print(f"  Removed from scans.tsv: {deleted_path}")
         
         # Save updated dataframe
         df.to_csv(scans_file, sep='\t', index=False)
-        print(f"Saved updated scans.tsv")
+        print(f"  ✓ Saved updated scans.tsv")
         
     except Exception as e:
-        print(f"Error updating scans.tsv: {e}")
+        print(f"  Warning: Error updating scans.tsv: {e}")
 
 def reorganize_fieldmaps(subject_dir, keep_extra=False):
-    """Reorganize GE fieldmap files after BIDS conversion"""
+    """Reorganize GE fieldmap files after BIDS conversion
+    
+    Args:
+        subject_dir: Path to subject directory (e.g., study_name/bids/rawdata/sub-001)
+        keep_extra: Whether to keep real and imaginary files (default: False)
+    
+    Returns:
+        tuple: (rename_mapping, files_deleted) for updating scans.tsv
+    """
     
     fmap_dir = os.path.join(subject_dir, 'fmap')
     if not os.path.exists(fmap_dir):
-        print(f"Fieldmap directory not found: {fmap_dir}")
+        print(f"  Fieldmap directory not found: {fmap_dir}")
         return {}, []
     
     rename_mapping = {}
@@ -88,7 +99,7 @@ def reorganize_fieldmaps(subject_dir, keep_extra=False):
                         new_json = new_base + '.json'
                         new_basename = os.path.basename(new_nii)
                         
-                        print(f"Renaming phase: {old_basename} -> {new_basename}")
+                        print(f"  Renaming phase: {old_basename} -> {new_basename}")
                         rename_mapping[old_basename] = new_basename
                         
                         # Remove existing file if it exists
@@ -107,7 +118,7 @@ def reorganize_fieldmaps(subject_dir, keep_extra=False):
                         new_json = new_base + '.json'
                         new_basename = os.path.basename(new_nii)
                         
-                        print(f"Renaming magnitude: {old_basename} -> {new_basename}")
+                        print(f"  Renaming magnitude: {old_basename} -> {new_basename}")
                         rename_mapping[old_basename] = new_basename
                         
                         # Remove existing file if it exists
@@ -120,45 +131,73 @@ def reorganize_fieldmaps(subject_dir, keep_extra=False):
                         os.rename(json_file, new_json)
     
     # Remove numbered magnitude files
-    print("\nRemoving numbered magnitude files...")
+    print("  Removing numbered magnitude files...")
     for pattern in ['*.nii.gz', '*.json']:
         for file in glob.glob(os.path.join(fmap_dir, f'*{pattern}')):
             basename = os.path.basename(file)
             # Check if it matches pattern like "magnitude12", "magnitude14", etc.
             if re.search(r'magnitude[12][1-4]\.(nii\.gz|json)$', basename):
-                print(f"Removing: {basename}")
+                print(f"  Removing: {basename}")
                 files_deleted.append(basename)
                 os.remove(file)
     
     # Remove extra files (real and imaginary) by default
     if not keep_extra:
-        print("Removing real and imaginary files...")
+        print("  Removing real and imaginary files...")
         for pattern in ['*_real.*', '*_imaginary.*']:
             for file in glob.glob(os.path.join(fmap_dir, pattern)):
                 basename = os.path.basename(file)
-                print(f"Removing: {basename}")
+                print(f"  Removing: {basename}")
                 files_deleted.append(basename)
                 os.remove(file)
     
     # List final contents
-    print("\nFinal fieldmap directory contents:")
-    for file in sorted(os.listdir(fmap_dir)):
-        print(f"  {file}")
+    print("  Final fieldmap directory contents:")
+    final_files = sorted(os.listdir(fmap_dir))
+    if final_files:
+        for file in final_files:
+            print(f"    {file}")
+    else:
+        print("    (no files remaining)")
     
     return rename_mapping, files_deleted
 
 def main():
-    parser = argparse.ArgumentParser(description='Reorganize GE fieldmap files after BIDS conversion')
-    parser.add_argument('set_name', help='Set name (e.g., OSKX_MR3_S1)')
-    parser.add_argument('--keep-extra', action='store_true', help='Keep real and imaginary files')
+    parser = argparse.ArgumentParser(
+        description='Reorganize GE fieldmap files after BIDS conversion for your study',
+        epilog='''
+Examples:
+  %(prog)s my_study_2024           # Reorganize GE fieldmaps for study 'my_study_2024'
+  %(prog)s ge_pilot --keep-extra   # Keep real/imaginary files during reorganization
+
+This script handles issues specific to GE fieldmap conversion:
+1. Corrects magnitude/phase file naming based on DICOM ImageType
+2. Removes duplicate and temporary files created during conversion
+3. Updates scans.tsv files to reflect the changes
+4. Cleans up real/imaginary files (unless --keep-extra is specified)
+
+Prerequisites:
+  - BIDS conversion completed with: bh05_make_bids.sh <study_name>
+  - GE fieldmap data present in: <study_name>/bids/rawdata/sub-*/fmap/
+
+Note: This script is specifically designed for GE scanner fieldmap data.
+For other vendors, this reorganization may not be necessary.
+        ''',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('study_name', help='Name of your research study')
+    parser.add_argument('--keep-extra', action='store_true', 
+                       help='Keep real and imaginary files (default: remove them)')
     
     args = parser.parse_args()
     
     # Construct rawdata path
-    rawdata_path = os.path.join(args.set_name, 'bids', 'rawdata')
+    rawdata_path = os.path.join(args.study_name, 'bids', 'rawdata')
     
     if not os.path.exists(rawdata_path):
-        print(f"Error: Rawdata directory not found: {rawdata_path}")
+        print(f"Error: BIDS rawdata directory not found: {rawdata_path}")
+        print(f"Please ensure BIDS conversion is completed for study '{args.study_name}'")
+        print(f"Run: bh05_make_bids.sh {args.study_name}")
         sys.exit(1)
     
     # Find all subject directories
@@ -168,11 +207,22 @@ def main():
         print(f"Error: No subject directories found in {rawdata_path}")
         sys.exit(1)
     
+    print(f"Reorganizing GE fieldmaps for study '{args.study_name}'")
+    print(f"Processing {len(subject_dirs)} subjects...")
+    print("")
+    
     # Process each subject
+    subjects_processed = 0
     for subject_dir in subject_dirs:
         subject_id = os.path.basename(subject_dir)
-        print(f"\nProcessing {subject_id}...")
+        print(f"Processing {subject_id}...")
         
+        # Check if subject has fieldmap directory
+        fmap_dir = os.path.join(subject_dir, 'fmap')
+        if not os.path.exists(fmap_dir):
+            print(f"  No fieldmap directory found, skipping...")
+            continue
+            
         # Reorganize fieldmaps and get rename mapping and deleted files
         rename_mapping, files_deleted = reorganize_fieldmaps(subject_dir, args.keep_extra)
         
@@ -181,9 +231,23 @@ def main():
         if os.path.exists(scans_file):
             update_scans_tsv(scans_file, rename_mapping, files_deleted)
         else:
-            print(f"Warning: scans.tsv not found at {scans_file}")
+            print(f"  Warning: scans.tsv not found at {scans_file}")
+            
+        subjects_processed += 1
+        print("")
     
-    print("\nDone.")
+    print("=" * 50)
+    if subjects_processed > 0:
+        print(f"✓ Successfully reorganized GE fieldmaps for {subjects_processed} subjects in study '{args.study_name}'")
+        print("")
+        print("Next steps:")
+        print("1. Validate your BIDS dataset with the BIDS validator")
+        print("2. Check that fieldmap files are correctly named and organized")
+        if not args.keep_extra:
+            print("3. Note: Real and imaginary files were removed (use --keep-extra to preserve them)")
+    else:
+        print(f"No subjects with fieldmap data found in study '{args.study_name}'")
+        print("This script is specifically for GE fieldmap reorganization.")
 
 if __name__ == '__main__':
     main()
