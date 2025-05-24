@@ -143,8 +143,12 @@ do
         echo "  Warning: Subject ${subject}_${session} does not match double-echo fieldmap criteria"
         echo "    - Number of fieldmap directories: $ndirs (expected: 2)"
         echo "    - Number of fieldmap files: $nfiles (expected: $fmapthr)"
-        echo "    Please check if this subject should be processed with bh05_make_bids.sh instead"
-        exit 1
+
+        echo "  → Falling back to standard BIDS conversion..."
+
+        # Fall back to standard BIDS conversion
+        bash bh05_make_bids.sh $study_name
+        exit $?  # Exit with the same code as the fallback script
     fi
     echo ""
 done
