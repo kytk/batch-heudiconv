@@ -1,9 +1,9 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04 as base
 
 # Metadata
 LABEL maintainer="batch-heudiconv"
 LABEL description="Docker container for batch-heudiconv: DICOM to BIDS conversion tools"
-LABEL version="1.0"
+LABEL version="2.0"
 
 # Environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -57,8 +57,47 @@ RUN pip3 install --no-cache-dir \
 # Create working directory
 WORKDIR /opt/batch-heudiconv
 
-# Copy batch-heudiconv scripts
+# ==============================================
+# Stage 1: Copy local files (default method)
+# ==============================================
+FROM base as copy-stage
+
+# Copy batch-heudiconv scripts from local directory
 COPY . /opt/batch-heudiconv/
+
+# ==============================================
+# Stage 2: Clone from Git repository
+# ==============================================
+FROM base as git-stage
+
+# Build arguments for Git method
+ARG GIT_REPO=https://github.com/kytk/batch-heudiconv.git
+ARG GIT_BRANCH=main
+
+# Clone the repository
+RUN git clone --depth 1 --branch ${GIT_BRANCH} ${GIT_REPO} /opt/batch-heudiconv
+
+# ==============================================
+# Final stage: Choose method based on build arg
+# ==============================================
+FROM base as final
+
+# Build argument to choose the method
+ARG BUILD_METHOD=copy
+
+# Copy files from the appropriate stage
+COPY --from=copy-stage /opt/batch-heudiconv /tmp/copy-method/
+COPY --from=git-stage /opt/batch-heudiconv /tmp/git-method/
+
+# Select the appropriate source based on BUILD_METHOD
+RUN if [ "$BUILD_METHOD" = "git" ]; then \
+        cp -r /tmp/git-method/* /opt/batch-heudiconv/ && \
+        echo "Using Git method (latest from repository)"; \
+    else \
+        cp -r /tmp/copy-method/* /opt/batch-heudiconv/ && \
+        echo "Using Copy method (local files)"; \
+    fi && \
+    rm -rf /tmp/copy-method /tmp/git-method
 
 # Set executable permissions for scripts
 RUN chmod +x /opt/batch-heudiconv/bh*.sh \
@@ -81,5 +120,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 CMD ["/bin/bash"]
 
 # Add usage instructions as labels
-LABEL usage="docker run -it --rm -v \$(pwd):/data kytk/batch-heudiconv:latest"
-LABEL examples="docker run -it --rm -v \$(pwd):/data kytk/batch-heudiconv:latest bh01_prep_dir.sh MR001"
+LABEL usage.copy="docker build -t batch-heudiconv ."
+LABEL usage.git="docker build --build-arg BUILD_METHOD=git -t batch-heudiconv:latest ."
+LABEL usage.git-dev="docker build --build-arg BUILD_METHOD=git --build-arg GIT_BRANCH=develop -t batch-heudiconv:dev ."
+LABEL examples="docker run -it --rm -v \$(pwd):/data batch-heudiconv:latest bh01_prep_dir.sh MR001"
