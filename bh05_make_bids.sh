@@ -5,7 +5,7 @@
 # K.Nemoto 24 May 2025
 
 # For debugging
-set -x
+#set -x
 
 usage() {
     echo "Convert sorted DICOM files to BIDS format for your study"
