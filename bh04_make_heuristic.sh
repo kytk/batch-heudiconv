@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script to create heuristic.py for BIDS conversion
 # Run this script after bh03_make_subjlist.sh
-# K.Nemoto 24 May 2025
+# K.Nemoto 26 Jun 2025
 
 # For debugging
 #set -x
