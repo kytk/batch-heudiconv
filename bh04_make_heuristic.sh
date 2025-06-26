@@ -48,6 +48,38 @@ mkdir -p "$study_name/code"
 series_list="$study_name/tmp/series_list.txt"
 template_file="$study_name/code/heuristic_${study_name}.py"
 
+# Function to get dim4 from DICOM files
+get_dim4_from_dicom() {
+    local dir=$1
+    local dim4=1
+    
+    # Try multiple methods to get the number of volumes
+    if command -v dcmdump >/dev/null 2>&1; then
+        local example_dcm=$(find "$dir" -type f \( -name "*.dcm" -o -name "*.IMA" \) | head -n 1)
+        if [[ -n "$example_dcm" ]]; then
+            # Try NumberOfTemporalPositions first
+            local temp_pos=$(dcmdump "$example_dcm" 2>/dev/null | grep "NumberOfTemporalPositions" | grep -o '[0-9]\+' | head -n 1)
+            if [[ -n "$temp_pos" && "$temp_pos" -gt 1 ]]; then
+                dim4=$temp_pos
+            else
+                # Fallback: count DICOM files in directory
+                local file_count=$(find "$dir" -type f \( -name "*.dcm" -o -name "*.IMA" \) | wc -l)
+                if [[ $file_count -gt 1 ]]; then
+                    dim4=$file_count
+                fi
+            fi
+        fi
+    else
+        # If dcmdump is not available, count files
+        local file_count=$(find "$dir" -type f \( -name "*.dcm" -o -name "*.IMA" \) | wc -l)
+        if [[ $file_count -gt 1 ]]; then
+            dim4=$file_count
+        fi
+    fi
+    
+    echo $dim4
+}
+
 # Function to detect sequence type based on directory name and DICOM header
 detect_sequence_type() {
     local dirname=$1
@@ -123,14 +155,8 @@ echo ""
 # Process each directory and create series list
 while IFS= read -r dir; do
     series_name=$(basename "$dir")
-    # Get dim4 from example DICOM if possible
-    dim4=1
-    if command -v dcmdump >/dev/null 2>&1; then
-        example_dcm=$(find "$dir" -type f -name "*.dcm" -o -name "*.IMA" | head -n 1)
-        if [[ -n "$example_dcm" ]]; then
-            dim4=$(dcmdump "$example_dcm" 2>/dev/null | grep NumberOfTemporalPositions || echo "1")
-        fi
-    fi
+    # Get dim4 from DICOM files
+    dim4=$(get_dim4_from_dicom "$dir")
     sequence_type=$(detect_sequence_type "$series_name" "$dim4")
     echo "$series_name|$sequence_type|$dim4" >> "$series_list"
 done < <(find "$study_name/DICOM/sorted" -mindepth 2 -maxdepth 2 -type d)
@@ -253,42 +279,65 @@ COMMON
 echo "        # Sequence matching rules based on your study's DICOM structure" >> "$template_file"
 echo "" >> "$template_file"
 
+# Create temporary file to track processed conditions (for old bash compatibility)
+conditions_file="$study_name/tmp/conditions_added.txt"
+> "$conditions_file"
+
 while IFS='|' read -r dirname seqtype dim4; do
     series_desc=${dirname#[0-9]*_}  # Remove series number
     case $seqtype in
         "T1w")
-            echo "        # T1-weighted: $dirname" >> "$template_file"
-            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
-            echo "            info[t1w].append(s.series_id)" >> "$template_file"
-            echo >> "$template_file"
+            condition_key="T1w_${series_desc}"
+            if ! grep -q "^${condition_key}$" "$conditions_file" 2>/dev/null; then
+                echo "        # T1-weighted: $series_desc" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+                echo "            info[t1w].append(s.series_id)" >> "$template_file"
+                echo >> "$template_file"
+                echo "$condition_key" >> "$conditions_file"
+            fi
             ;;
         "func_rest")
-            echo "        # Resting-state fMRI: $dirname" >> "$template_file"
-            echo "        if '${series_desc}' in s.dcm_dir_name and s.dim4 >= 100:" >> "$template_file"
-            echo "            info[func_rest].append(s.series_id)" >> "$template_file"
-            echo >> "$template_file"
+            condition_key="func_rest_${series_desc}"
+            if ! grep -q "^${condition_key}$" "$conditions_file" 2>/dev/null; then
+                echo "        # Resting-state fMRI: $series_desc" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+                echo "            info[func_rest].append(s.series_id)" >> "$template_file"
+                echo >> "$template_file"
+                echo "$condition_key" >> "$conditions_file"
+            fi
             ;;
         "dwi")
-            echo "        # Diffusion-weighted: $dirname" >> "$template_file"
-            echo "        if '${series_desc}' in s.dcm_dir_name and s.dim4 > 5:" >> "$template_file"
-            echo "            info[dwi].append(s.series_id)" >> "$template_file"
-            echo >> "$template_file"
+            condition_key="dwi_${series_desc}"
+            if ! grep -q "^${condition_key}$" "$conditions_file" 2>/dev/null; then
+                echo "        # Diffusion-weighted: $series_desc" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+                echo "            info[dwi].append(s.series_id)" >> "$template_file"
+                echo >> "$template_file"
+                echo "$condition_key" >> "$conditions_file"
+            fi
             ;;
         "fieldmap_siemens")
-            echo "        # Fieldmap (Siemens): $dirname" >> "$template_file"
-            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
-            echo "            if 'M' in s.image_type:" >> "$template_file"
-            echo "                info[fmap_mag].append(s.series_id)" >> "$template_file"
-            echo "            if 'P' in s.image_type:" >> "$template_file"
-            echo "                info[fmap_phase].append(s.series_id)" >> "$template_file"
-            echo >> "$template_file"
+            condition_key="fieldmap_siemens_${series_desc}"
+            if ! grep -q "^${condition_key}$" "$conditions_file" 2>/dev/null; then
+                echo "        # Fieldmap (magnitude and phasediff: Siemens): $series_desc" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name and 'M' in s.image_type:" >> "$template_file"
+                echo "            info[fmap_mag].append(s.series_id)" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name and 'P' in s.image_type:" >> "$template_file"
+                echo "            info[fmap_phase].append(s.series_id)" >> "$template_file"
+                echo >> "$template_file"
+                echo "$condition_key" >> "$conditions_file"
+            fi
             ;;
         "fieldmap_ge")
-            echo "        # Fieldmap (GE): $dirname" >> "$template_file"
-            echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
-            echo "            # GE fieldmaps need special handling - review and adjust" >> "$template_file"
-            echo "            info[fmap_mag].append(s.series_id)" >> "$template_file"
-            echo >> "$template_file"
+            condition_key="fieldmap_ge_${series_desc}"
+            if ! grep -q "^${condition_key}$" "$conditions_file" 2>/dev/null; then
+                echo "        # Fieldmap (magnitude and field: GE): $series_desc" >> "$template_file"
+                echo "        if '${series_desc}' in s.dcm_dir_name:" >> "$template_file"
+                echo "            # GE fieldmaps need special handling - review and adjust" >> "$template_file"
+                echo "            info[fmap_mag].append(s.series_id)" >> "$template_file"
+                echo >> "$template_file"
+                echo "$condition_key" >> "$conditions_file"
+            fi
             ;;
     esac
 done < "$series_list"
@@ -321,6 +370,6 @@ echo "  - Multiple phase encoding directions"
 echo "  - Multi-echo sequences"
 
 # Cleanup
-rm -f "$series_list"
+rm -f "$series_list" "$study_name/tmp/conditions_added.txt"
 
 exit 0
