@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as base
+FROM ubuntu:22.04 AS base
 
 # Metadata
 LABEL maintainer="batch-heudiconv"
@@ -62,7 +62,7 @@ WORKDIR /opt/batch-heudiconv
 # ==============================================
 # Stage 1: Copy local files (default method)
 # ==============================================
-FROM base as copy-stage
+FROM base AS copy-stage
 
 # Copy batch-heudiconv scripts from local directory
 COPY . /opt/batch-heudiconv/
@@ -70,7 +70,7 @@ COPY . /opt/batch-heudiconv/
 # ==============================================
 # Stage 2: Clone from Git repository
 # ==============================================
-FROM base as git-stage
+FROM base AS git-stage
 
 # Build arguments for Git method
 ARG GIT_REPO=https://github.com/kytk/batch-heudiconv.git
@@ -82,7 +82,7 @@ RUN git clone --depth 1 --branch ${GIT_BRANCH} ${GIT_REPO} /opt/batch-heudiconv
 # ==============================================
 # Final stage: Choose method based on build arg
 # ==============================================
-FROM base as final
+FROM base AS final
 
 # Build argument to choose the method
 ARG BUILD_METHOD=copy
@@ -151,7 +151,7 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 # Default command
 CMD ["/bin/bash"]
 
-# Add usage instructions as labels
+# Add usage instructions AS labels
 LABEL usage.basic="docker run -it --rm -v \$(pwd):/data batch-heudiconv:latest"
 LABEL usage.with-user="docker run -it --rm -v \$(pwd):/data -e HOST_UID=\$(id -u) -e HOST_GID=\$(id -g) batch-heudiconv:latest"
 LABEL usage.build="docker build -t batch-heudiconv ."
