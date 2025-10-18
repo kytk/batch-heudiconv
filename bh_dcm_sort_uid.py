@@ -6,7 +6,7 @@
 # Part of this script is based on the script provided by Yuya Saito
 # Prerequisite: pydicom and numpy
 
-# 15 May 2024 K. Nemoto
+# 16 Oct 2025 K. Nemoto
 
 import os
 import time
@@ -14,17 +14,26 @@ import re
 import shutil
 import argparse
 import pydicom
+import sys
+
 
 __version__ = '20240515'
 
 __desc__ = '''
 sort dicom files.
+Sorted DICOM files are named using SOPInstanceUID.
 Please note that PatientID is assumed from the directory name.
 Non-imaging DICOM will be skipped.
+
+This script is useful when dealing with DICOM files from certain vendors (e.g., Philips)
+that store files with identical filenames in different directories.
+By renaming files with their SOPInstanceUID, this prevents file loss due to
+filename conflicts during the sorting process.
 '''
 __epilog__ = '''
 examples:
   dcm_sort_uid.py DICOM_DIR
+  dcm_sort_uid.py DICOM_DIR1 DICOM_DIR2 DICOM_DIR3
 '''
 
 def generate_dest_dir_name(dicom_dataset: pydicom.dataset.FileDataset) -> str:
@@ -44,7 +53,7 @@ def copy_dicom_files(src_dir: str, sorted_dir: str = '../sorted/') -> None:
                 ds = pydicom.dcmread(src_file)
                 if hasattr(ds, 'pixel_array'):
                     dest_dir_name = generate_dest_dir_name(ds)
-                    out_dir = os.path.join(sorted_dir, os.path.basename(src_dir))
+                    out_dir = os.path.join(sorted_dir, os.path.basename(os.path.normpath(src_dir)))
                     dest_dir = os.path.join(out_dir, dest_dir_name)
                     os.makedirs(dest_dir, exist_ok=True)
                     uid = str(ds.SOPInstanceUID)
@@ -58,13 +67,17 @@ def main() -> int:
     start_time = time.time()
     parser = argparse.ArgumentParser(description=__desc__, epilog=__epilog__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('dirs', metavar='DICOM_DIR', help='DICOM directory.', nargs=1)
+    parser.add_argument('dirs', metavar='DICOM_DIR', help='DICOM directory (one or more).', nargs='+')
+
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        return 1
 
     try:
         args = parser.parse_args()
-        src_dir = args.dirs[0]
-        print(f"Processing directory: {src_dir}")
-        copy_dicom_files(src_dir)
+        for src_dir in args.dirs:
+            print(f"Processing directory: {src_dir}")
+            copy_dicom_files(src_dir)
         elapsed_time = time.time() - start_time
         print(f"Execution time: {elapsed_time:.2f} seconds.")
         return 0
