@@ -1,5 +1,5 @@
 # heuristic.py for OSKX_MR1_S1
-# K. Nemoto 17 Nov 2025
+# K. Nemoto 03 Jan 2026
 
 import os
 
@@ -22,7 +22,7 @@ def infotodict(seqinfo):
     ##### list keys for t1w, t2w, dwi, rs-fMRI, and filedmaps below ############
 
     # T1
-    t1w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T1w')
+    t1w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T1w')
 
     # T2
     #t2w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T2w')

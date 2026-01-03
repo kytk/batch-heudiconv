@@ -1,5 +1,5 @@
 # heuristic.py for OSKX_MR2_S1
-# K. Nemoto 17 Apr 2025
+# K. Nemoto 03 Jan 2026
 
 import os
 
@@ -22,20 +22,20 @@ def infotodict(seqinfo):
     ##### list keys for t1w, t2w, dwi, rs-fMRI, and filedmaps below ############
 
     # T1
-    t1w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T1w')
+    t1w = create_key('sub-{subject}/{session}/anat/sub-{subject}_{session}_run-{item:02d}_T1w')
 
     # T2
     #t2w = create_key('sub-{subject}/anat/sub-{subject}_run-{item:02d}_T2w')
 
     # Resting-state (only one phase encoding)
-    func_rest = create_key('sub-{subject}/func/sub-{subject}_task-rest_run-{item:02d}_bold')
+    func_rest = create_key('sub-{subject}/{session}/func/sub-{subject}_{session}_task-rest_run-{item:02d}_bold')
 
     # Resting-state (PA and AP)
     #func_rest_PA = create_key('sub-{subject}/func/sub-{subject}_dir-PA_task-rest_run-{item:02d}_bold')
     #func_rest_AP = create_key('sub-{subject}/func/sub-{subject}_dir-AP_task-rest_run-{item:02d}_bold')
 
     # DWI (only one phase encoding)
-    dwi = create_key('sub-{subject}/dwi/sub-{subject}_run-{item:02d}_dwi')
+    dwi = create_key('sub-{subject}/{session}/dwi/sub-{subject}_{session}_run-{item:02d}_dwi')
 
     # DWI (PA and AP)
     #dwi_PA = create_key('sub-{subject}/dwi/sub-{subject}_dir-PA_run-{item:02d}_dwi')
