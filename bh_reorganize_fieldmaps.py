@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Reorganize GE fieldmap files after BIDS conversion
 # This script handles the complex file naming issues that occur with GE fieldmaps during heudiconv processing
-# K.Nemoto 24 May 2025
+# K.Nemoto 13 Jan 2026
 
 import os
 import json
