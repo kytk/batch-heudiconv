@@ -58,18 +58,17 @@ def update_scans_tsv(scans_file, rename_mapping, files_deleted):
     except Exception as e:
         print(f"  Warning: Error updating scans.tsv: {e}")
 
-def reorganize_fieldmaps(subject_dir, keep_extra=False):
+def reorganize_fieldmaps(fmap_dir, keep_extra=False):
     """Reorganize GE fieldmap files after BIDS conversion
-    
+
     Args:
-        subject_dir: Path to subject directory (e.g., study_name/bids/rawdata/sub-001)
+        fmap_dir: Path to fieldmap directory (e.g., study_name/bids/rawdata/sub-001/ses-123/fmap)
         keep_extra: Whether to keep real and imaginary files (default: False)
-    
+
     Returns:
         tuple: (rename_mapping, files_deleted) for updating scans.tsv
     """
-    
-    fmap_dir = os.path.join(subject_dir, 'fmap')
+
     if not os.path.exists(fmap_dir):
         print(f"  Fieldmap directory not found: {fmap_dir}")
         return {}, []
@@ -179,9 +178,11 @@ This script handles issues specific to GE fieldmap conversion:
 Prerequisites:
   - BIDS conversion completed with: bh05_make_bids.sh <study_name>
   - GE fieldmap data present in: <study_name>/bids/rawdata/sub-*/fmap/
+    or <study_name>/bids/rawdata/sub-*/ses-*/fmap/
 
 Note: This script is specifically designed for GE scanner fieldmap data.
 For other vendors, this reorganization may not be necessary.
+This script supports both session-level and subject-level BIDS structures.
         ''',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -210,30 +211,58 @@ For other vendors, this reorganization may not be necessary.
     print(f"Reorganizing GE fieldmaps for study '{args.study_name}'")
     print(f"Processing {len(subject_dirs)} subjects...")
     print("")
-    
+
     # Process each subject
     subjects_processed = 0
     for subject_dir in subject_dirs:
         subject_id = os.path.basename(subject_dir)
         print(f"Processing {subject_id}...")
-        
-        # Check if subject has fieldmap directory
-        fmap_dir = os.path.join(subject_dir, 'fmap')
-        if not os.path.exists(fmap_dir):
-            print(f"  No fieldmap directory found, skipping...")
-            continue
-            
-        # Reorganize fieldmaps and get rename mapping and deleted files
-        rename_mapping, files_deleted = reorganize_fieldmaps(subject_dir, args.keep_extra)
-        
-        # Update scans.tsv with both renamed and deleted files
-        scans_file = os.path.join(subject_dir, f"{subject_id}_scans.tsv")
-        if os.path.exists(scans_file):
-            update_scans_tsv(scans_file, rename_mapping, files_deleted)
+
+        # Check for session directories (ses-*)
+        session_dirs = glob.glob(os.path.join(subject_dir, 'ses-*'))
+
+        if session_dirs:
+            # Process each session
+            for session_dir in session_dirs:
+                session_id = os.path.basename(session_dir)
+                print(f"  Processing {session_id}...")
+
+                # Check if session has fieldmap directory
+                fmap_dir = os.path.join(session_dir, 'fmap')
+                if not os.path.exists(fmap_dir):
+                    print(f"    No fieldmap directory found, skipping...")
+                    continue
+
+                # Reorganize fieldmaps and get rename mapping and deleted files
+                rename_mapping, files_deleted = reorganize_fieldmaps(fmap_dir, args.keep_extra)
+
+                # Update scans.tsv with both renamed and deleted files
+                scans_file = os.path.join(session_dir, f"{subject_id}_{session_id}_scans.tsv")
+                if os.path.exists(scans_file):
+                    update_scans_tsv(scans_file, rename_mapping, files_deleted)
+                else:
+                    print(f"    Warning: scans.tsv not found at {scans_file}")
+
+                subjects_processed += 1
         else:
-            print(f"  Warning: scans.tsv not found at {scans_file}")
-            
-        subjects_processed += 1
+            # No session directories, try subject-level fieldmap directory (legacy structure)
+            fmap_dir = os.path.join(subject_dir, 'fmap')
+            if not os.path.exists(fmap_dir):
+                print(f"  No fieldmap directory found, skipping...")
+                continue
+
+            # Reorganize fieldmaps and get rename mapping and deleted files
+            rename_mapping, files_deleted = reorganize_fieldmaps(fmap_dir, args.keep_extra)
+
+            # Update scans.tsv with both renamed and deleted files
+            scans_file = os.path.join(subject_dir, f"{subject_id}_scans.tsv")
+            if os.path.exists(scans_file):
+                update_scans_tsv(scans_file, rename_mapping, files_deleted)
+            else:
+                print(f"  Warning: scans.tsv not found at {scans_file}")
+
+            subjects_processed += 1
+
         print("")
     
     print("=" * 50)
