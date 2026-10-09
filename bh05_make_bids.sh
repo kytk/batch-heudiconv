@@ -2,14 +2,21 @@
 # Script to convert DICOM to BIDS using heudiconv
 # Run this script after bh04_make_heuristic.sh
 # Prerequisites: dcm2niix and heudiconv
-# K.Nemoto 24 May 2025
+# K.Nemoto 09 Oct 2026
 
 # For debugging
 #set -x
 
 usage() {
     echo "Convert sorted DICOM files to BIDS format for your study"
-    echo "Usage: $0 <study_name>"
+    echo "Usage: $0 <study_name> [--merge]"
+    echo ""
+    echo "Options:"
+    echo "  --merge    Create code/merge.json ({\"merge_imgs\": true}) for double-echo"
+    echo "             fieldmaps whose two echoes must be merged by dcm2niix"
+    echo ""
+    echo "If <study_name>/code/merge.json exists, it is passed to heudiconv"
+    echo "(--dcmconfig) for all subjects."
     echo ""
     echo "Prerequisites:"
     echo "  - Study setup completed with previous bh0X scripts"
@@ -19,9 +26,9 @@ usage() {
     echo ""
     echo "This script will:"
     echo "1. Convert DICOM to BIDS format using heudiconv"
-    echo "2. Create proper BIDS directory structure"
-    echo "3. Backup original DICOM files"
-    echo "4. Generate BIDS validation-ready dataset"
+    echo "2. Populate IntendedFor of fieldmaps (via POPULATE_INTENDED_FOR_OPTS in heuristic)"
+    echo "3. Move DICOM files of successfully converted subjects to DICOM/converted/"
+    echo "4. Check IntendedFor fields of fieldmaps"
     echo ""
     echo "Output: <study_name>/bids/rawdata/ (BIDS dataset)"
     exit 1
@@ -33,17 +40,36 @@ fi
 
 # Parameters
 study_name=${1%/}
+shift
+create_merge=0
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --merge) create_merge=1 ;;
+        *) echo "Error: Unknown option: $1"; echo ""; usage ;;
+    esac
+    shift
+done
+merge_config="code/merge.json"
 heuristic="code/heuristic_${study_name}.py"
 subjlist="tmp/subjlist_${study_name}.tsv"
+logdir="tmp/logs"
+
+# Check required commands
+for cmd in heudiconv dcm2niix python3; do
+    if ! command -v $cmd >/dev/null 2>&1; then
+        echo "Error: '$cmd' not found in PATH"
+        exit 1
+    fi
+done
 
 # Check if study directory exists
-if [[ ! -d $study_name ]]; then
+if [[ ! -d "$study_name" ]]; then
     echo "Error: Study directory '$study_name' does not exist"
     echo "Please run: bh01_prep_dir.sh $study_name"
     exit 1
 fi
 
-cd $study_name
+cd "$study_name" || exit 1
 
 # Check prerequisites
 if [[ ! -f $subjlist ]]; then
@@ -65,6 +91,35 @@ if [[ ! -d DICOM/sorted ]]; then
     exit 1
 fi
 
+# Check IntendedFor settings in heuristic
+# (lines starting with '#' are ignored)
+if ! grep -q '^[[:space:]]*POPULATE_INTENDED_FOR_OPTS' "$heuristic"; then
+    if grep -v '^[[:space:]]*#' "$heuristic" | grep -q "create_key(.*/fmap/"; then
+        echo "Warning: POPULATE_INTENDED_FOR_OPTS is not defined in $heuristic"
+        echo "         IntendedFor of fieldmaps will not be populated"
+        echo ""
+    fi
+elif grep -v '^[[:space:]]*#' "$heuristic" | grep -q "ModalityAcquisitionLabel"; then
+    # ModalityAcquisitionLabel requires acq-<func|dwi|anat> in every fmap key
+    no_acq=$(grep -v '^[[:space:]]*#' "$heuristic" | grep "create_key(.*/fmap/" | grep -v "_acq-")
+    if [[ -n "$no_acq" ]]; then
+        echo "Error: ModalityAcquisitionLabel is used, but some fmap keys have no acq- label:"
+        echo "$no_acq" | sed 's/^[[:space:]]*/  /'
+        echo "Add acq-func, acq-dwi, or acq-anat to these keys (e.g. ..._acq-func_phasediff)"
+        exit 1
+    fi
+fi
+
+# dcm2niix configuration (e.g. merging double-echo fieldmaps)
+if [[ $create_merge -eq 1 && ! -f $merge_config ]]; then
+    echo '{"merge_imgs": true}' > "$merge_config"
+    echo "Created $merge_config"
+fi
+dcmconfig_opt=()
+if [[ -f $merge_config ]]; then
+    dcmconfig_opt=(--dcmconfig "$merge_config")
+fi
+
 # Extract pattern from subject list file
 pattern=$(grep '^# pattern:' "$subjlist" | sed 's/^# pattern: //')
 if [[ -z "$pattern" ]]; then
@@ -75,71 +130,146 @@ fi
 
 echo "Pattern detected from subject list: $pattern"
 
-# Note: heudiconv will automatically replace {subject} placeholder in the pattern
-
-# Clean up any previous heudiconv directory
-[[ -d bids/.heudiconv ]] && rm -rf bids/.heudiconv
+mkdir -p "$logdir"
 
 # Process subjects
 echo "Starting BIDS conversion for study: $study_name"
 echo "Using heuristic: $heuristic"
 echo "Using pattern: $pattern"
+if [[ ${#dcmconfig_opt[@]} -gt 0 ]]; then
+    echo "Using dcm2niix config: $merge_config ($(tr -d '\n' < "$merge_config"))"
+fi
+echo "Logs: $study_name/$logdir/"
 echo ""
 
-# Count total subjects
-total_subjects=$(($(grep -v '^#' "$subjlist" | wc -l) - 1))
+# Subject list without comment, header, and empty lines
+subjects=$(grep -v '^#' "$subjlist" | tail -n +2 | grep -v '^[[:space:]]*$')
+total_subjects=$(echo -n "$subjects" | grep -c '^')
 current_subject=0
+succeeded=()
+failed=()
 
-# Process each subject (skip comment lines)
-grep -v '^#' "$subjlist" | tail -n +2 | while IFS=$'\t' read -r dirpattern subject session
+while IFS=$'\t' read -r dirpattern subject session
 do
     current_subject=$((current_subject + 1))
     echo "[$current_subject/$total_subjects] Processing: Subject=$subject Session=$session (Directory: $dirpattern)"
-    
+
+    # Remove cached heudiconv info for this subject/session
+    # so that changes in the heuristic are always applied
+    rm -rf "bids/rawdata/.heudiconv/${subject}/ses-${session}"
+
+    logfile="${logdir}/heudiconv_${subject}_${session}.log"
     echo "  Using DICOM pattern: DICOM/sorted/${pattern}/*/*"
-    echo "  Running heudiconv..."
-    
-    # Run heudiconv
-    heudiconv -d DICOM/sorted/${pattern}/*/* \
+    echo "  Running heudiconv... (log: $logfile)"
+
+    # heudiconv expands the pattern by itself, so keep it quoted
+    # stdin is redirected not to consume the subject list
+    heudiconv -d "DICOM/sorted/${pattern}/*/*" \
               -o bids/rawdata \
               -f "$heuristic" \
               -s "$subject" \
               -ss "$session" \
               -c dcm2niix \
+              "${dcmconfig_opt[@]}" \
               -b \
-              --overwrite
-              
-    # Check heudiconv exit status
+              --overwrite \
+              < /dev/null > "$logfile" 2>&1
+
     if [[ $? -ne 0 ]]; then
-        echo "  Warning: heudiconv reported an error for subject $subject session $session"
-        echo "  Check the logs and heuristic file for issues"
+        echo "  ✗ heudiconv reported an error for subject $subject session $session"
+        tail -n 5 "$logfile" | sed 's/^/    /'
+        failed+=("$dirpattern")
     else
         echo "  ✓ Successfully processed subject $subject"
+        succeeded+=("$dirpattern")
     fi
     echo ""
-done
+done <<< "$subjects"
+
+# Remove events.tsv stubs generated by heudiconv for resting-state runs
+# (only untouched stubs are removed)
+events_stub=$'onset\tduration\ttrial_type\tresponse_time\tstim_file\tTODO -- fill in rows and add more tab-separated columns if desired'
+while IFS= read -r -d '' events_file; do
+    if [[ "$(cat "$events_file")" == "$events_stub" ]]; then
+        rm -f "$events_file"
+        echo "Removed events.tsv stub: ${events_file#bids/rawdata/}"
+    fi
+done < <(find bids/rawdata -path '*/func/*task-rest*_events.tsv' -print0 2>/dev/null)
 
 # Set appropriate permissions
 echo "Setting file permissions..."
-find bids/rawdata -type d -exec chmod 755 {} \; 2>/dev/null
-find bids/rawdata -type f -exec chmod 644 {} \; 2>/dev/null
+chmod -R u=rwX,go=rX bids/rawdata 2>/dev/null
 
-# Backup DICOM files
+# Backup DICOM files of successfully converted subjects
+# DICOM files of failed subjects are left in DICOM/sorted and DICOM/original
 echo "Backing up DICOM files..."
-if [[ ! -d DICOM/converted ]]; then
-    mkdir -p DICOM/converted
-fi
+timestamp=$(date +%Y%m%d-%H%M%S)
+for dirpattern in "${succeeded[@]}"; do
+    for src in sorted original; do
+        [[ -d "DICOM/${src}/${dirpattern}" ]] || continue
+        dest="DICOM/converted/${src}/${dirpattern}"
+        mkdir -p "DICOM/converted/${src}"
+        # Do not overwrite previous backup
+        if [[ -e "$dest" ]]; then
+            dest="${dest}_${timestamp}"
+            echo "  Previous backup exists; saving as $dest"
+        fi
+        mv "DICOM/${src}/${dirpattern}" "$dest"
+    done
+done
 
-# Move instead of copy to save space
-if [[ -d DICOM/sorted ]]; then
-    mv DICOM/sorted DICOM/converted/
-fi
-if [[ -d DICOM/original ]]; then
-    mv DICOM/original DICOM/converted/
-fi
-
-# Create empty directories for future use
+# Keep empty directories for future use
 mkdir -p DICOM/sorted DICOM/original
+
+# Check IntendedFor of fieldmaps
+echo ""
+echo "Checking IntendedFor fields of fieldmaps..."
+python3 - bids/rawdata << 'PYEOF'
+import glob
+import json
+import os
+import sys
+
+bids_dir = sys.argv[1]
+n_fmap = 0
+problems = []
+for fmap_json in sorted(glob.glob(os.path.join(bids_dir, 'sub-*', '**', 'fmap', '*.json'),
+                                  recursive=True)):
+    n_fmap += 1
+    rel = os.path.relpath(fmap_json, bids_dir)
+    subj_dir = os.path.join(bids_dir, rel.split(os.sep)[0])
+    try:
+        with open(fmap_json) as f:
+            intended_for = json.load(f).get('IntendedFor')
+    except Exception as e:
+        problems.append(f'{rel}: cannot read ({e})')
+        continue
+    if not intended_for:
+        problems.append(f'{rel}: IntendedFor is missing or empty')
+        continue
+    if isinstance(intended_for, str):
+        intended_for = [intended_for]
+    for target in intended_for:
+        # BIDS URI is relative to the dataset root; otherwise relative to subject
+        if target.startswith('bids::'):
+            path = os.path.join(bids_dir, target[len('bids::'):])
+        else:
+            path = os.path.join(subj_dir, target)
+        if not os.path.exists(path):
+            problems.append(f'{rel}: target not found: {target}')
+
+if n_fmap == 0:
+    print('  No fieldmaps found')
+elif problems:
+    print(f'  Warning: {len(problems)} issue(s) found in {n_fmap} fieldmap JSON files')
+    for p in problems:
+        print(f'    - {p}')
+    print('  Fix the fmap keys / POPULATE_INTENDED_FOR_OPTS in the heuristic and re-run,')
+    print('  or re-populate without conversion:')
+    print('    heudiconv --command populate-intended-for -o bids/rawdata -f <heuristic> [-s <ID> -ss <ID>]')
+else:
+    print(f'  ✓ IntendedFor is set in all {n_fmap} fieldmap JSON files')
+PYEOF
 
 echo ""
 echo "============================================"
@@ -148,9 +278,14 @@ echo "============================================"
 echo ""
 echo "Results:"
 echo "  - BIDS dataset: $study_name/bids/rawdata/"
-echo "  - Subjects processed: $total_subjects"
+echo "  - Succeeded: ${#succeeded[@]} / $total_subjects"
+echo "  - Failed:    ${#failed[@]} / $total_subjects"
+for dirpattern in "${failed[@]}"; do
+    echo "      $dirpattern (DICOM left in DICOM/sorted/)"
+done
 echo "  - Pattern used: $pattern"
 echo "  - DICOM backup: $study_name/DICOM/converted/"
+echo "  - Logs: $study_name/$logdir/"
 echo ""
 echo "Next steps:"
 echo "1. Validate BIDS dataset: https://bids-standard.github.io/bids-validator/"
@@ -158,7 +293,9 @@ echo "2. Review conversion logs for any warnings"
 echo "3. Check dataset_description.json and README files"
 echo ""
 echo "Optional post-processing:"
-echo "  - Fix IntendedFor fields: bh_fix_intendedfor.py $study_name"
 echo "  - Reorganize GE fieldmaps: bh_reorganize_fieldmaps.py $study_name"
 
+if [[ ${#failed[@]} -gt 0 ]]; then
+    exit 1
+fi
 exit 0

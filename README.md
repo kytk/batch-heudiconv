@@ -125,13 +125,13 @@ bh05_make_bids.sh <study_name>
 ```
 
 #### Double-Echo Fieldmap Data
-For datasets with double-echo fieldmaps:
+For datasets with double-echo fieldmaps whose two echoes must be merged by dcm2niix:
 
 ```bash
-bh05_make_bids_double_echo_fieldmap.sh <study_name> [fieldmap_threshold]
+bh05_make_bids.sh <study_name> --merge
 ```
 
-The `fieldmap_threshold` parameter is optional (default: 78).
+`--merge` creates `code/merge.json` (`{"merge_imgs": true}`). Once this file exists, it is passed to heudiconv (`--dcmconfig`) for all subjects, so later runs do not need `--merge`. Remove the file to disable it.
 
 ## Study Directory Structure
 
@@ -162,11 +162,6 @@ study_name/
 ### 🔧 **Utility Scripts (run as needed)**
 
 These scripts address specific post-processing needs and can be run independently:
-
-**Fix fieldmap references:**
-```bash
-bh_fix_intendedfor.py <study_name>
-```
 
 **Reorganize GE fieldmaps:**
 ```bash
@@ -309,16 +304,19 @@ bh04_make_heuristic.sh <研究名>
 bh05_make_bids.sh <研究名>
 ```
 
+2つのエコーを dcm2niix で結合する必要がある double-echo fieldmap の場合:
+
+```bash
+bh05_make_bids.sh <研究名> --merge
+```
+
+`--merge` は `code/merge.json`（`{"merge_imgs": true}`）を作成します。このファイルが存在すると全被験者に `--dcmconfig` として適用されるため、2回目以降は `--merge` は不要です。無効にするにはファイルを削除してください。
+
 ---
 
 ### 🔧 **ユーティリティスクリプト（必要に応じて実行）**
 
 これらのスクリプトは特定の後処理に対応し、独立して実行できます：
-
-**fieldmap参照の修正:**
-```bash
-bh_fix_intendedfor.py <研究名>
-```
 
 **GE fieldmapの整理:**
 ```bash
