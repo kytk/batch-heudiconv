@@ -1,5 +1,11 @@
 import os
 
+# Fill IntendedFor automatically: fmap with acq-dwi -> dwi/, acq-func -> func/, etc.
+POPULATE_INTENDED_FOR_OPTS = {
+    'matching_parameters': ['ModalityAcquisitionLabel'],
+    'criterion': 'Closest'
+}
+
 def create_key(template, outtype=('nii.gz',), annotation_classes=None):
     if template is None or not template:
         raise ValueError('Template must be a valid format string')
